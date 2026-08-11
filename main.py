@@ -1,275 +1,179 @@
-import asyncio
-from tkinter import Tk, filedialog
 import flet as ft
 from core import colors
-from core.database import (
-    init_db, get_orders, update_order_status, delete_order, 
-    clear_all_orders, import_vcf_contacts, get_logs, clear_all_contacts
-)
-from components.kanban_column import KanbanColumn
-from components.quick_order_bar import QuickOrderBar
+from core.database import init_db, clear_all_orders, get_orders, update_order_status, delete_order, import_vcf_contacts
 from components.sidebar import Sidebar
+from components.quick_order_bar import QuickOrderBar
+from components.kanban_column import KanbanColumn
 from views.materials_view import MaterialsView
-
-STAGES = ["Orçamento", "Produção", "Pronto", "Faturado"]
-
-STAGE_COLORS = {
-    "Orçamento": colors.COLOR_ORCAMENTO,
-    "Produção": colors.COLOR_PRODUCAO,
-    "Pronto": colors.COLOR_PRONTO,
-    "Faturado": colors.COLOR_FATURADO,
-}
-
-def main(page: ft.Page):
-    # Configurações da página...
-    page.title = "AGA HELP - Gestão de Pedidos e Materiais"
-    
-    # Instância da nova tela
-    materials_view = MaterialsView()
-
-    # Adicione a exibição da tela na árvore de controles do Flet conforme o menu/navegação da sua aplicação
-    page.add(materials_view)
-
-ft.app(target=main)
-
-def open_native_file_picker():
-    root = Tk()
-    root.withdraw()
-    root.attributes("-topmost", True)
-    file_path = filedialog.askopenfilename(
-        title="Selecione o arquivo da agenda (.vcf)",
-        filetypes=[("Arquivos VCF / vCard", "*.vcf"), ("Todos os Arquivos", "*.*")]
-    )
-    root.destroy()
-    return file_path
 
 def main(page: ft.Page):
     init_db()
-    
-    page.title = "Aga-Help - Controle de Pedidos"
-    page.bg_color = colors.GH_BG
-    page.bgcolor = colors.GH_BG
+
+    # Janela Maximizada e Tema com Scrollbar Claro
+    page.title = "AGA HELP - Sistema Agatek"
+    page.bgcolor = colors.BG_PRIMARY
     page.padding = 0
-    page.theme_mode = ft.ThemeMode.DARK
-
-    current_view = "kanban"
-    toast_timer_task = None
-
-    toast_text = ft.Text("", size=12, color=colors.TEXT_PRIMARY, weight=ft.FontWeight.W_500)
-    toast_icon = ft.Icon(getattr(ft.Icons, "CHECK_CIRCLE", None) or "check", size=16, color="#3FB950")
-    
-    toast_container = ft.Container(
-        content=ft.Row([toast_icon, toast_text], spacing=8),
-        bgcolor=colors.BG_SURFACE_LIGHT,
-        border=ft.Border.all(1, colors.BORDER_COLOR) if hasattr(ft, "Border") else None,
-        border_radius=8,
-        padding=ft.Padding(12, 8, 12, 8) if hasattr(ft, "Padding") else None,
-        visible=False,
-        animate_opacity=200
-    )
-
-    def show_toast(message: str, is_error: bool = False, display_seconds: float = 3.0):
-        nonlocal toast_timer_task
-
-        if toast_timer_task and not toast_timer_task.done():
-            toast_timer_task.cancel()
-
-        toast_text.value = message
-        if is_error:
-            toast_icon.name = getattr(ft.Icons, "ERROR_OUTLINE", None) or "error"
-            toast_icon.color = "#F85149"
-            toast_container.border = ft.Border.all(1, "#F85149") if hasattr(ft, "Border") else None
-        else:
-            toast_icon.name = getattr(ft.Icons, "CHECK_CIRCLE", None) or "check"
-            toast_icon.color = "#3FB950"
-            toast_container.border = ft.Border.all(1, colors.PRIMARY) if hasattr(ft, "Border") else None
-        
-        toast_container.visible = True
-        page.update()
-
-        async def auto_hide():
-            await asyncio.sleep(display_seconds)
-            toast_container.visible = False
-            page.update()
-
-        toast_timer_task = page.run_task(auto_hide)
-
-    kanban_grid = ft.ResponsiveRow(spacing=12, run_spacing=12)
-
-    def refresh_kanban():
-        orders = get_orders()
-        kanban_grid.controls.clear()
-
-        for stage in STAGES:
-            stage_orders = [o for o in orders if o["status"] == stage]
-            col_component = KanbanColumn(
-                stage=stage,
-                orders=stage_orders,
-                stage_color=STAGE_COLORS[stage],
-                stages=STAGES,
-                on_move_callback=move_stage,
-                on_delete_callback=remove_order
-            )
-            kanban_grid.controls.append(ft.Container(col_component, col={"sm": 12, "md": 3}))
-
-        if current_view == "kanban":
-            render_view()
-
-    def move_stage(order_id: int, new_status: str):
-        update_order_status(order_id, new_status)
-        show_toast(f"Pedido movido para {new_status}")
-        refresh_kanban()
-
-    def remove_order(order_id: int):
-        delete_order(order_id)
-        show_toast("Pedido excluído do sistema", is_error=True)
-        refresh_kanban()
-
-    def handle_clear_all():
-        clear_all_orders()
-        show_toast("Banco de dados zerado com sucesso", is_error=True)
-        refresh_kanban()
-
-    def handle_import_vcf():
-        file_path = open_native_file_picker()
-        if file_path:
-            try:
-                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                    vcf_text = f.read()
-                count = import_vcf_contacts(vcf_text)
-                if count > 0:
-                    show_toast(f"{count} contatos importados da agenda!")
-                else:
-                    show_toast("Nenhum contato novo para importar.", is_error=True)
-                render_view()
-            except Exception:
-                show_toast("Erro ao ler arquivo VCF", is_error=True)
-
-    def handle_clear_contacts():
-        clear_all_contacts()
-        show_toast("Contatos da agenda removidos", is_error=True)
-        render_view()
-
-    def handle_quick_save():
-        show_toast("Novo pedido cadastrado com sucesso!")
-        refresh_kanban()
-
-    view_container = ft.Container(expand=True, padding=16)
-    quick_bar = QuickOrderBar(stages=STAGES, on_save_callback=handle_quick_save)
-
-    def build_logs_view():
-        logs = get_logs()
-        log_rows = []
-
-        for log in logs:
-            badge_color = colors.PRIMARY if log["action_type"] in ("IMPORTAÇÃO", "NOVO PEDIDO") else "#F85149"
-            log_rows.append(
-                ft.DataRow(cells=[
-                    ft.DataCell(ft.Text(log["created_at"], size=11, color=colors.TEXT_MUTED)),
-                    ft.DataCell(ft.Container(
-                        content=ft.Text(log["action_type"], size=10, weight=ft.FontWeight.BOLD, color=colors.TEXT_PRIMARY),
-                        bgcolor=badge_color,
-                        padding=ft.Padding(6, 2, 6, 2) if hasattr(ft, "Padding") else None,
-                        border_radius=4
-                    )),
-                    ft.DataCell(ft.Text(log["description"], size=12, color=colors.TEXT_PRIMARY)),
-                ])
-            )
-
-        if not log_rows:
-            return ft.Text("Nenhuma ocorrência registrada até o momento.", size=12, color=colors.TEXT_MUTED)
-
-        return ft.DataTable(
-            columns=[
-                ft.DataColumn(ft.Text("Data e Hora", size=11, weight=ft.FontWeight.BOLD, color=colors.TEXT_SECONDARY)),
-                ft.DataColumn(ft.Text("Ação", size=11, weight=ft.FontWeight.BOLD, color=colors.TEXT_SECONDARY)),
-                ft.DataColumn(ft.Text("Detalhes da Ocorrência", size=11, weight=ft.FontWeight.BOLD, color=colors.TEXT_SECONDARY)),
-            ],
-            rows=log_rows,
-            border_radius=8,
-            bgcolor=colors.BG_SURFACE,
-        )
-
-    def render_view():
-        view_container.content = None
-        
-        if current_view == "kanban":
-            view_container.content = ft.Column([
-                ft.Row([
-                    ft.Text("1. Acompanhamento de Pedidos (Kanban)", size=16, weight=ft.FontWeight.BOLD, color=colors.TEXT_PRIMARY),
-                    toast_container
-                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                ft.Divider(color=colors.BORDER_COLOR, height=8),
-                ft.Column([kanban_grid], scroll=ft.ScrollMode.AUTO, expand=True)
-            ], spacing=10, expand=True)
-
-        elif current_view == "add":
-            view_container.content = ft.Column([
-                ft.Row([
-                    ft.Text("2. Cadastro de Novo Pedido", size=16, weight=ft.FontWeight.BOLD, color=colors.TEXT_PRIMARY),
-                    toast_container
-                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                ft.Divider(color=colors.BORDER_COLOR, height=8),
-                quick_bar
-            ], spacing=10, expand=True)
-
-        else:
-            view_container.content = ft.Column([
-                ft.Row([
-                    ft.Text("3. Ações da Agenda e Histórico de Ocorrências", size=16, weight=ft.FontWeight.BOLD, color=colors.TEXT_PRIMARY),
-                    toast_container
-                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-                ft.Divider(color=colors.BORDER_COLOR, height=8),
-                
-                ft.Row([
-                    ft.Button(
-                        "Importar Agenda (.VCF)",
-                        icon=getattr(ft.Icons, "CONTACTS", None) or "contacts",
-                        style=ft.ButtonStyle(bgcolor=colors.PRIMARY, color=colors.TEXT_PRIMARY),
-                        on_click=lambda _: handle_import_vcf()
-                    ),
-                    ft.OutlinedButton(
-                        "Limpar Agenda de Contatos",
-                        icon=getattr(ft.Icons, "DELETE_SWEEP", None) or "delete",
-                        style=ft.ButtonStyle(color="#F85149"),
-                        on_click=lambda _: handle_clear_contacts()
-                    )
-                ], spacing=12),
-                
-                ft.Divider(color=colors.BORDER_COLOR, height=12),
-                ft.Text("Histórico de Ocorrências e Registros de Importação", size=13, weight=ft.FontWeight.BOLD, color=colors.TEXT_SECONDARY),
-                
-                ft.Column([build_logs_view()], scroll=ft.ScrollMode.AUTO, expand=True)
-            ], spacing=10, expand=True)
-            
-        page.update()
-
-    def navigate_to(view_name):
-        nonlocal current_view
-        current_view = view_name
-        sidebar.set_active(view_name)
-        render_view()
-
-    sidebar = Sidebar(
-        on_navigate=navigate_to,
-        on_clear_click=handle_clear_all
-    )
-
-    app_layout = ft.Row([
-        sidebar,
-        view_container
-    ], spacing=0, expand=True)
-
-    page.add(app_layout)
+    page.spacing = 0
 
     if hasattr(page, "window"):
         page.window.maximized = True
-    else:
-        page.window_maximized = True
 
-    refresh_kanban()
+    # Estilização explícita da barra de rolagem (ScrollbarVisível/Branca)
+    page.theme = ft.Theme(
+        scrollbar_theme=ft.ScrollbarTheme(
+            thumb_color={
+                ft.ControlState.HOVERED: "#FFFFFF",
+                ft.ControlState.DEFAULT: "#8B949E",
+            },
+            thickness=8,
+            radius=4,
+        )
+    )
+
+    # Fluxo sem a etapa "Proposta"
+    stages = ["Orçamento", "Produção", "Pronto", "Faturado"]
+    stage_colors = {
+        "Orçamento": colors.COLOR_ORCAMENTO,
+        "Produção": colors.COLOR_PRODUCAO,
+        "Pronto": colors.COLOR_PRONTO,
+        "Faturado": colors.COLOR_FATURADO
+    }
+
+    content_area = ft.Container(expand=True, padding=10, bgcolor=colors.BG_PRIMARY)
+
+    # --- KANBAN ---
+    def move_order(order_id: int, new_stage: str):
+        update_order_status(order_id, new_stage)
+        render_kanban_view()
+
+    def remove_order(order_id: int):
+        delete_order(order_id)
+        render_kanban_view()
+
+    def render_kanban_view():
+        orders = get_orders()
+        kanban_row = ft.Row(spacing=10, scroll=ft.ScrollMode.AUTO, expand=True)
+
+        for stage in stages:
+            stage_orders = [o for o in orders if o.get("status") == stage]
+            col = KanbanColumn(
+                stage=stage,
+                orders=stage_orders,
+                stage_color=stage_colors[stage],
+                stages=stages,
+                on_move_callback=move_order,
+                on_delete_callback=remove_order
+            )
+            kanban_row.controls.append(col)
+
+        content_area.content = ft.Column([
+            ft.Text("ACOMPANHAMENTO DE PEDIDOS (KANBAN)", size=13, weight=ft.FontWeight.BOLD, color=colors.TEXT_PRIMARY),
+            kanban_row
+        ], spacing=10, expand=True)
+        page.update()
+
+    # --- NOVO PEDIDO ---
+    def on_order_saved():
+        sidebar.set_active("kanban")
+        render_kanban_view()
+        page.snack_bar = ft.SnackBar(ft.Text("Ordem gerada com sucesso!"))
+        page.snack_bar.open = True
+        page.update()
+
+    quick_order_view = QuickOrderBar(stages=stages, on_save_callback=on_order_saved)
+
+    # --- AGENDA (.VCF) ---
+    txt_vcf_input = ft.TextField(
+        label="Cole o conteúdo do arquivo de contatos (.VCF) aqui",
+        multiline=True,
+        min_lines=8,
+        max_lines=12,
+        border_color=colors.BORDER_COLOR,
+        bgcolor=colors.BG_SURFACE_LIGHT,
+        text_style=ft.TextStyle(size=11, color=colors.TEXT_PRIMARY)
+    )
+
+    lbl_agenda_msg = ft.Text("", size=11, color=colors.PRIMARY)
+
+    def process_vcf_import(e):
+        vcf_data = (txt_vcf_input.value or "").strip()
+        if not vcf_data:
+            lbl_agenda_msg.value = "Cole o texto VCF antes de importar."
+            lbl_agenda_msg.color = "#F85149"
+            page.update()
+            return
+
+        added_count = import_vcf_contacts(vcf_data)
+        lbl_agenda_msg.value = f"Importação concluída! {added_count} novos contatos salvos no banco."
+        lbl_agenda_msg.color = colors.COLOR_PRONTO
+        txt_vcf_input.value = ""
+        page.update()
+
+    btn_import_vcf = (
+        ft.Button(
+            "Importar Contatos VCF",
+            icon=getattr(ft.Icons, "UPLOAD_FILE_ROUNDED", None) or "upload",
+            style=ft.ButtonStyle(bgcolor=colors.PRIMARY, color=colors.TEXT_PRIMARY),
+            on_click=process_vcf_import
+        ) if hasattr(ft, "Button") else ft.ElevatedButton(
+            "Importar Contatos VCF",
+            icon=getattr(ft.Icons, "UPLOAD_FILE_ROUNDED", None) or "upload",
+            style=ft.ButtonStyle(bgcolor=colors.PRIMARY, color=colors.TEXT_PRIMARY),
+            on_click=process_vcf_import
+        )
+    )
+
+    agenda_view = ft.Container(
+        padding=10,
+        expand=True,
+        content=ft.Column([
+            ft.Text("AÇÕES AGENDA - GERENCIAMENTO E IMPORTAÇÃO DE CONTATOS", size=13, weight=ft.FontWeight.BOLD, color=colors.TEXT_PRIMARY),
+            ft.Text("Cole o código VCF exportado da sua agenda para alimentar o autocompletar de revendas:", size=11, color=colors.TEXT_MUTED),
+            txt_vcf_input,
+            ft.Row([btn_import_vcf, lbl_agenda_msg], spacing=10)
+        ], spacing=10)
+    )
+
+    # --- MATERIAIS ---
+    materials_view = MaterialsView()
+
+    # --- NAVEGAÇÃO ---
+    def navigate_to(view_name: str):
+        sidebar.set_active(view_name)
+        if view_name == "kanban":
+            render_kanban_view()
+        elif view_name == "add":
+            content_area.content = quick_order_view
+        elif view_name == "agenda":
+            content_area.content = agenda_view
+        elif view_name == "materials":
+            content_area.content = materials_view
+        page.update()
+
+    def on_clear_database():
+        clear_all_orders()
+        render_kanban_view()
+        page.snack_bar = ft.SnackBar(ft.Text("Banco de dados limpo com sucesso!"))
+        page.snack_bar.open = True
+        page.update()
+
+    sidebar = Sidebar(on_navigate=navigate_to, on_clear_click=on_clear_database)
+
+    main_layout = ft.Row(
+        [
+            sidebar,
+            ft.VerticalDivider(width=1, color=colors.BORDER_COLOR),
+            content_area,
+        ],
+        expand=True,
+        spacing=0
+    )
+
+    page.add(main_layout)
+    render_kanban_view()
 
 if __name__ == "__main__":
-    run_app = getattr(ft, "run", None) or getattr(ft, "app", None)
-    if run_app:
-        run_app(main)
+    if hasattr(ft, "run"):
+        ft.run(main)
+    else:
+        ft.app(target=main)

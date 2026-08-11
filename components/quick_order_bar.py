@@ -32,6 +32,7 @@ class QuickOrderBar(ft.Container):
         self._is_updating = False
         self.selected_components = []
 
+        # Estilo visível para campos de texto e seletores
         input_style = dict(
             height=45,
             content_padding=make_padding_symmetric(horizontal=10, vertical=0),
@@ -80,6 +81,8 @@ class QuickOrderBar(ft.Container):
                 ft.dropdown.Option("rolo", text="Serviço em Cortina Rolô"),
                 ft.dropdown.Option("horizontal", text="Serviço em Cortina Horizontal")
             ],
+            color=colors.TEXT_PRIMARY,
+            fill_color=colors.BG_SURFACE_LIGHT,
             **input_style
         )
 
@@ -87,7 +90,8 @@ class QuickOrderBar(ft.Container):
             label="Prazo *",
             value="3",
             options=[ft.dropdown.Option(str(i), text=f"{i} dia útil" if i == 1 else f"{i} dias úteis") for i in range(1, 8)],
-            text_size=12,
+            color=colors.TEXT_PRIMARY,
+            fill_color=colors.BG_SURFACE_LIGHT,
             **input_style
         )
 
@@ -129,7 +133,6 @@ class QuickOrderBar(ft.Container):
             **input_style
         )
 
-        # BOTÃO GERAR ORDEM DE SERVIÇO
         self.btn_generate_order = ft.ElevatedButton(
             "Gerar Ordem de Serviço",
             icon=getattr(ft.Icons, "CHECK_ROUNDED", None) or "check",
@@ -146,7 +149,6 @@ class QuickOrderBar(ft.Container):
         self.lbl_error = ft.Text("", size=11, color="#F85149", visible=False)
         border_all = ft.Border.all(1, colors.BORDER_COLOR) if hasattr(ft, "Border") else ft.border.all(1, colors.BORDER_COLOR)
 
-        # 1. CONTAINER IDENTIFICAÇÃO REVENDA
         box_reseller = ft.Container(
             bgcolor=colors.BG_SURFACE,
             border=border_all,
@@ -163,7 +165,6 @@ class QuickOrderBar(ft.Container):
             ], spacing=8)
         )
 
-        # 2. CONTAINER ESPECIFICAÇÃO DO PEDIDO
         box_order = ft.Container(
             bgcolor=colors.BG_SURFACE,
             border=border_all,
@@ -179,7 +180,6 @@ class QuickOrderBar(ft.Container):
             ], spacing=8)
         )
 
-        # 3. CONTAINER ADIÇÃO DE COMPONENTES
         col_catalog = ft.Column([
             ft.Text("CATÁLOGO DE COMPONENTES", size=10, weight=ft.FontWeight.BOLD, color=colors.TEXT_MUTED),
             ft.Row([self.txt_component_search]),
@@ -205,7 +205,6 @@ class QuickOrderBar(ft.Container):
             ], spacing=8)
         )
 
-        # 4. CONTAINER ESPECIFICAÇÃO DO SERVIÇO
         box_service = ft.Container(
             bgcolor=colors.BG_SURFACE,
             border=border_all,
@@ -229,7 +228,6 @@ class QuickOrderBar(ft.Container):
         self._render_components_list(COMPONENTS_CATALOG[:2])
         self._render_selected_items()
 
-        # MONTAGEM PRINCIPAL
         super().__init__(
             content=ft.Column([
                 ft.Row([
@@ -283,6 +281,7 @@ class QuickOrderBar(ft.Container):
                 content_padding=make_padding_symmetric(horizontal=6, vertical=0),
                 border_color=colors.BORDER_COLOR,
                 bgcolor=colors.BG_SURFACE_LIGHT if is_meter else colors.BG_SURFACE,
+                text_style=ft.TextStyle(color=colors.TEXT_PRIMARY),
                 keyboard_type=ft.KeyboardType.NUMBER
             )
 
@@ -294,6 +293,7 @@ class QuickOrderBar(ft.Container):
                 content_padding=make_padding_symmetric(horizontal=6, vertical=0),
                 border_color=colors.BORDER_COLOR,
                 bgcolor=colors.BG_SURFACE_LIGHT,
+                text_style=ft.TextStyle(color=colors.TEXT_PRIMARY, weight=ft.FontWeight.BOLD),
                 keyboard_type=ft.KeyboardType.NUMBER
             )
 
