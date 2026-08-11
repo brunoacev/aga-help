@@ -57,6 +57,19 @@ class Sidebar(ft.Container):
             on_click=lambda _: self.on_navigate("agenda")
         )
 
+        # Módulo 4: Materiais e Componentes (NOVO)
+        self.txt_materials = ft.Text("4. Materiais", size=12, color=colors.TEXT_PRIMARY, visible=False, weight=ft.FontWeight.W_500)
+        self.btn_materials = ft.Container(
+            content=ft.Row([
+                ft.Icon(getattr(ft.Icons, "INVENTORY_2_ROUNDED", None) or "inventory", color=colors.TEXT_SECONDARY, size=20),
+                self.txt_materials
+            ], spacing=12),
+            padding=make_padding_symmetric(horizontal=12, vertical=10),
+            border_radius=8,
+            bgcolor="transparent",
+            on_click=lambda _: self.on_navigate("materials")
+        )
+
         # Botão Limpar Banco (Rodapé)
         self.txt_clear = ft.Text("Limpar Banco", size=12, color="#F85149", visible=False, weight=ft.FontWeight.W_500)
         self.btn_clear = ft.Container(
@@ -88,7 +101,8 @@ class Sidebar(ft.Container):
                 ft.Column([
                     self.btn_kanban,
                     self.btn_add,
-                    self.btn_contacts
+                    self.btn_contacts,
+                    self.btn_materials
                 ], spacing=6, expand=True),
 
                 self.btn_clear
@@ -97,13 +111,17 @@ class Sidebar(ft.Container):
 
     def set_active(self, view_name: str):
         self.active_view = view_name
+        
         self.btn_kanban.bgcolor = colors.BG_SURFACE_LIGHT if view_name == "kanban" else "transparent"
         self.btn_add.bgcolor = colors.BG_SURFACE_LIGHT if view_name == "add" else "transparent"
         self.btn_contacts.bgcolor = colors.BG_SURFACE_LIGHT if view_name == "agenda" else "transparent"
+        self.btn_materials.bgcolor = colors.BG_SURFACE_LIGHT if view_name == "materials" else "transparent"
         
         self.btn_kanban.content.controls[0].color = colors.PRIMARY if view_name == "kanban" else colors.TEXT_SECONDARY
         self.btn_add.content.controls[0].color = colors.PRIMARY if view_name == "add" else colors.TEXT_SECONDARY
         self.btn_contacts.content.controls[0].color = colors.PRIMARY if view_name == "agenda" else colors.TEXT_SECONDARY
+        self.btn_materials.content.controls[0].color = colors.PRIMARY if view_name == "materials" else colors.TEXT_SECONDARY
+        
         self.update()
 
     def _handle_hover(self, e):
@@ -114,6 +132,7 @@ class Sidebar(ft.Container):
         self.txt_kanban.visible = is_hovered
         self.txt_add.visible = is_hovered
         self.txt_contacts.visible = is_hovered
+        self.txt_materials.visible = is_hovered
         self.txt_clear.visible = is_hovered
 
         self.update()

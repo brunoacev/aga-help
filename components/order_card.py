@@ -26,50 +26,48 @@ class OrderCard(ft.Container):
         current_status = order.get("status", "Orçamento")
         
         value = float(order.get("value", 0.0))
-        commission = value * 0.02  # Cálculo de 2% de comissão
+        commission = value * 0.02
 
         formatted_value = f"R$ {value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         formatted_commission = f"R$ {commission:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
         # Cabeçalho do Card
         card_header = ft.Row([
-            ft.Text(f"Pedido #{order_number}", weight=ft.FontWeight.BOLD, size=13, color=colors.TEXT_PRIMARY),
-            ft.Text(reseller_name, size=12, color=colors.PRIMARY, weight=ft.FontWeight.W_500)
+            ft.Text(f"Pedido #{order_number}", weight=ft.FontWeight.BOLD, size=12, color=colors.TEXT_PRIMARY),
+            ft.Text(reseller_name, size=11, color=colors.PRIMARY, weight=ft.FontWeight.W_500, overflow=ft.TextOverflow.ELLIPSIS)
         ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
 
         # Informações de Contato e Endereço Fixo
         contact_info = []
         if phone:
-            contact_info.append(ft.Text(f"📞 {phone}", size=11, color=colors.TEXT_SECONDARY))
-        contact_info.append(ft.Text(f"📍 {address}", size=11, color=colors.TEXT_MUTED, overflow=ft.TextOverflow.ELLIPSIS))
+            contact_info.append(ft.Text(f"📞 {phone}", size=10, color=colors.TEXT_SECONDARY))
+        contact_info.append(ft.Text(f"📍 {address}", size=10, color=colors.TEXT_MUTED, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS))
 
-        # Medidas
+        # Medidas e Descrição
         dimensions_text = f" 📐 {width or '?'}m x {height or '?'}m" if (width or height) else ""
-        desc_text = ft.Text(f"{description}{dimensions_text}", size=11, color=colors.TEXT_SECONDARY)
+        desc_text = ft.Text(f"{description}{dimensions_text}", size=10, color=colors.TEXT_SECONDARY, max_lines=2, overflow=ft.TextOverflow.ELLIPSIS)
 
-        # Bloco Financeiro: Valor Total + 2% Comissão
+        # Bloco Financeiro
         financial_box = ft.Container(
             content=ft.Row([
                 ft.Column([
-                    ft.Text("VALOR TOTAL", size=9, color=colors.TEXT_MUTED, weight=ft.FontWeight.BOLD),
-                    ft.Text(formatted_value, size=13, weight=ft.FontWeight.BOLD, color=colors.TEXT_PRIMARY),
+                    ft.Text("VALOR TOTAL", size=8, color=colors.TEXT_MUTED, weight=ft.FontWeight.BOLD),
+                    ft.Text(formatted_value, size=11, weight=ft.FontWeight.BOLD, color=colors.TEXT_PRIMARY),
                 ], spacing=1),
                 ft.Column([
-                    ft.Text("COMISSÃO (2%)", size=9, color=colors.PRIMARY, weight=ft.FontWeight.BOLD),
-                    ft.Text(formatted_commission, size=12, weight=ft.FontWeight.BOLD, color=colors.PRIMARY),
+                    ft.Text("COMISSÃO (2%)", size=8, color=colors.PRIMARY, weight=ft.FontWeight.BOLD),
+                    ft.Text(formatted_commission, size=11, weight=ft.FontWeight.BOLD, color=colors.PRIMARY),
                 ], spacing=1, alignment=ft.MainAxisAlignment.END)
             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
             bgcolor=colors.BG_SURFACE_LIGHT,
-            padding=make_padding_symmetric(horizontal=10, vertical=6),
+            padding=make_padding_symmetric(horizontal=8, vertical=4),
             border_radius=6
         )
 
-        # Botões de ação com ÍCONES padronizados do mesmo tamanho da lixeira (size 16)
+        # Botões de Ação
         action_buttons = []
-        
         curr_index = stages.index(current_status) if current_status in stages else 0
 
-        # Ícone de Recuar Etapa (Voltar)
         if curr_index > 0:
             prev_stage = stages[curr_index - 1]
             action_buttons.append(
@@ -77,12 +75,12 @@ class OrderCard(ft.Container):
                     icon=getattr(ft.Icons, "ARROW_BACK_ROUNDED", None) or "arrow_back",
                     icon_color=colors.TEXT_SECONDARY,
                     icon_size=16,
+                    padding=0,
                     tooltip=f"Voltar para {prev_stage}",
                     on_click=lambda _: self.on_move_callback(order_id, prev_stage)
                 )
             )
 
-        # Ícone de Avançar Etapa (Avançar)
         if curr_index < len(stages) - 1:
             next_stage = stages[curr_index + 1]
             action_buttons.append(
@@ -90,21 +88,21 @@ class OrderCard(ft.Container):
                     icon=getattr(ft.Icons, "ARROW_FORWARD_ROUNDED", None) or "arrow_forward",
                     icon_color=colors.PRIMARY,
                     icon_size=16,
+                    padding=0,
                     tooltip=f"Avançar para {next_stage}",
                     on_click=lambda _: self.on_move_callback(order_id, next_stage)
                 )
             )
 
-        # Ícone da Lixeira (Excluir)
         btn_delete = ft.IconButton(
             icon=getattr(ft.Icons, "DELETE_OUTLINE", None) or "delete",
             icon_color="#F85149",
             icon_size=16,
+            padding=0,
             tooltip="Excluir Pedido",
             on_click=lambda _: self.on_delete_callback(order_id)
         )
 
-        # Rodapé com o mesmo layout: Mover à Esquerda, Lixeira à Direita
         actions_row = ft.Row([
             ft.Row(action_buttons, spacing=2),
             btn_delete
@@ -113,6 +111,7 @@ class OrderCard(ft.Container):
         border_card = ft.Border.all(1, colors.BORDER_COLOR) if hasattr(ft, "Border") else None
 
         super().__init__(
+            width=260, # LARGURA FIXA PARA MANTER A UNIFORMIDADE DOS CARDS
             bgcolor=colors.BG_SURFACE,
             border=border_card,
             border_radius=8,
@@ -122,7 +121,7 @@ class OrderCard(ft.Container):
                 ft.Column(contact_info, spacing=2),
                 desc_text,
                 financial_box,
-                ft.Divider(color=colors.BORDER_COLOR, height=10),
+                ft.Divider(color=colors.BORDER_COLOR, height=6),
                 actions_row
             ], spacing=6)
         )

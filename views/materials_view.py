@@ -9,7 +9,6 @@ def make_padding_symmetric(horizontal=0, vertical=0):
 
 class MaterialsView(ft.Container):
     def __init__(self):
-        # Filtro de busca geral para a lista de materiais
         self.txt_search = ft.TextField(
             label="Buscar por Código ou Nome do Material",
             hint_text="Ex: 5060, Comando, Perfil, Lâmina...",
@@ -23,7 +22,7 @@ class MaterialsView(ft.Container):
             expand=True
         )
 
-        # Colunas de exibição por categoria
+        # Colunas com Scroll Ativado
         self.col_horizontals = ft.Column(spacing=6, scroll=ft.ScrollMode.AUTO)
         self.col_top = ft.Column(spacing=6, scroll=ft.ScrollMode.AUTO)
         self.col_verticals = ft.Column(spacing=6, scroll=ft.ScrollMode.AUTO)
@@ -31,15 +30,14 @@ class MaterialsView(ft.Container):
 
         self.border_all = ft.Border.all(1, colors.BORDER_COLOR) if hasattr(ft, "Border") else ft.border.all(1, colors.BORDER_COLOR)
 
-        # Renderização inicial dividindo os materiais do catálogo
         self._load_and_categorize_materials(COMPONENTS_CATALOG)
 
         super().__init__(
-            padding=15,
+            padding=10,
             expand=True,
             content=ft.Column([
                 ft.Row([
-                    ft.Text("CATÁLOGO DE MATERIAIS E COMPONENTES", size=14, weight=ft.FontWeight.BOLD, color=colors.TEXT_PRIMARY),
+                    ft.Text("CATÁLOGO DE MATERIAIS E COMPONENTES", size=13, weight=ft.FontWeight.BOLD, color=colors.TEXT_PRIMARY),
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                 ft.Row([self.txt_search]),
                 ft.ResponsiveRow([
@@ -47,19 +45,18 @@ class MaterialsView(ft.Container):
                     ft.Container(self._build_column_card("TOP (RECENTES)", self.col_top, is_highlighted=True), col={"sm": 12, "md": 3}),
                     ft.Container(self._build_column_card("VERTICAIS", self.col_verticals), col={"sm": 12, "md": 3}),
                     ft.Container(self._build_column_card("PERFIL", self.col_profiles), col={"sm": 12, "md": 3}),
-                ], run_spacing=10, spacing=10, expand=True)
-            ], spacing=12)
+                ], run_spacing=8, spacing=8, expand=True)
+            ], spacing=10, scroll=ft.ScrollMode.AUTO)
         )
 
     def _build_column_card(self, title: str, column_control: ft.Column, is_highlighted=False):
-        """Cria um contêiner estilizado para cada categoria com barra de rolagem independente."""
         title_color = colors.PRIMARY if is_highlighted else colors.TEXT_MUTED
         
         return ft.Container(
             bgcolor=colors.BG_SURFACE,
             border=self.border_all,
             border_radius=8,
-            padding=10,
+            padding=8,
             content=ft.Column([
                 ft.Row([
                     ft.Text(title, size=11, weight=ft.FontWeight.BOLD, color=title_color)
@@ -68,13 +65,12 @@ class MaterialsView(ft.Container):
                 ft.Container(
                     content=column_control,
                     expand=True,
-                    height=480
+                    height=420 # Altura ajustada com scroll para evitar esticar a tela
                 )
-            ], spacing=8)
+            ], spacing=6)
         )
 
     def _load_and_categorize_materials(self, catalog_items):
-        """Distribui os itens do catálogo nas 4 colunas."""
         self.col_horizontals.controls.clear()
         self.col_top.controls.clear()
         self.col_verticals.controls.clear()
@@ -87,7 +83,6 @@ class MaterialsView(ft.Container):
 
             item_card = self._create_material_item_card(code, name)
 
-            # Lógica de distribuição por categoria
             if "top" in category or "comando" in category or "suporte" in category or "rolo" in category:
                 self.col_top.controls.append(item_card)
             elif "horizontal" in category or "lâmina" in category or "lamina" in category:
@@ -97,10 +92,8 @@ class MaterialsView(ft.Container):
             elif "perfil" in category or "tubo" in category or "bandô" in category or "bando" in category or "trilho" in category:
                 self.col_profiles.controls.append(item_card)
             else:
-                # Caso a categoria não pertença a nenhuma regra explícita, aloca em TOP
                 self.col_top.controls.append(item_card)
 
-        # Mensagem para colunas vazias
         for col, col_name in [(self.col_horizontals, "Horizontais"), (self.col_top, "TOP"), (self.col_verticals, "Verticais"), (self.col_profiles, "Perfil")]:
             if not col.controls:
                 col.controls.append(
@@ -108,7 +101,6 @@ class MaterialsView(ft.Container):
                 )
 
     def _create_material_item_card(self, code: str, name: str):
-        """Cria o card de exibição no padrão 'CÓDIGO - NOME'."""
         return ft.Container(
             content=ft.Row([
                 ft.Container(
@@ -120,7 +112,7 @@ class MaterialsView(ft.Container):
                 ft.Text("-", size=10, color=colors.TEXT_MUTED),
                 ft.Text(name, size=10, color=colors.TEXT_PRIMARY, expand=True, overflow=ft.TextOverflow.ELLIPSIS)
             ], spacing=6, alignment=ft.MainAxisAlignment.START),
-            padding=make_padding_symmetric(horizontal=8, vertical=6),
+            padding=make_padding_symmetric(horizontal=8, vertical=4),
             bgcolor=colors.BG_SURFACE_LIGHT,
             border=self.border_all,
             border_radius=6

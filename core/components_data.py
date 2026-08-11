@@ -1,6 +1,79 @@
-# Lista de componentes extraída diretamente do documento POP. CORTINA ROLÔ
-COMPONENTS_CATALOG = [
-    # Tubos e Acessórios de Tubo
+# Lista de materiais para Cortinas Horizontais (15mm, 25mm e 50mm)
+HORIZONTAL_COMPONENTS = [
+    # 15mm e 25mm
+    {"code": "1248", "name": "Cavelete", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "1257", "name": "Freio", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "1259", "name": "Giratório", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "1268", "name": "Suporte do Cavete", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "1253", "name": "Clip para Suporte do Cavete", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "1251", "name": "Clip para Cadarço", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "1256", "name": "Eixo Quadrado", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "1243", "name": "Bastão de Comando", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "1258", "name": "Gancho do Bastão", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "1269", "name": "Tampa do Bastão", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "7636", "name": "Puxador Externo", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "8827", "name": "Tampa do Bastão OKNA", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "8831", "name": "Puxador Equalizador", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "4757", "name": "Comando Entre Vidros", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "8833", "name": "Puxador Interno / Equalizador", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "1252", "name": "Clip de Instalação", "category": "Horizontais", "unit_price": 0.0},
+
+    # 50mm
+    {"code": "10015", "name": "Trilho 50mm Super Mono (Branco)", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "10016", "name": "Trilho 50mm Super Mono (Preto)", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "10546", "name": "Trilho 50mm Super Mono (Bege)", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "10018", "name": "Trilho 50mm Super Mono (Cinza)", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "10017", "name": "Trilho 50mm Super Mono (Marrom)", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "2356", "name": "Trilho 50mm Superior Standart (Branco)", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "5812", "name": "Trilho 50mm Superior Standart (Preto)", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "5816", "name": "Trilho 50mm Superior Standart (Marrom)", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "5576", "name": "Trilho 50mm PVC Branco Inferior", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "5579", "name": "Presilha da Base p/ Fita no Trilho Inferior PVC", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "2375", "name": "Presilha da Base para Fita", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "2391", "name": "Tampa da Base 50mm", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "2366", "name": "Eixo 50mm", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "9739", "name": "Suporte Estabilizador 50mm", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "9738", "name": "Cavalete para Monocomando com Enrolador", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "8309", "name": "Presilha da Lâmina de Madeira para 50mm", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "8310", "name": "Presilha da Lâmina de Alumínio para 50mm", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "6076", "name": "Tampa do Cabeçote 50mm", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "2368", "name": "Freio 50mm", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "2367", "name": "Giratório 50mm", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "2371", "name": "Tambor Plástico 50mm para Cadarço", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "4125", "name": "Cavalete 50mm Universal para Fita", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "2370", "name": "Cavalete Plástico para Cadarço", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "10124", "name": "Suporte de Instalação Monocomando PH 50", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "6054", "name": "Suporte de Instalação Standart PH 50", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "9737", "name": "Monocomando e Ponta Oposta (Branco)", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "9736", "name": "Monocomando e Ponta Oposta (Preto)", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "10547", "name": "Monocomando e Ponta Oposta (Bege)", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "10019", "name": "Monocomando e Ponta Oposta (Cinza)", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "9735", "name": "Monocomando e Ponta Oposta (Marrom)", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "1959", "name": "Presilha para Base 50mm (Branca)", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "1960", "name": "Presilha para Base 50mm (Preta)", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "2209", "name": "Presilha para Base 50mm (Bege)", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "1953", "name": "Presilha para Base 50mm (Cinza)", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "2400", "name": "Cadarço 44mm (Branco)", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "6210", "name": "Cadarço 44mm (Preto)", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "2404", "name": "Cadarço 44mm (Bege)", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "2402", "name": "Cadarço 44mm (Cinza)", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "2406", "name": "Cadarço 44mm (Marrom)", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "1406", "name": "Corda 1.2 (Branca)", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "1416", "name": "Corda 1.2 (Preta)", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "1415", "name": "Corda 1.2 (Bege)", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "1413", "name": "Corda 1.2 (Cinza)", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "1423", "name": "Corda 1.2 (Marrom)", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "5759", "name": "Suporte de Motor e Ponteira PH 50", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "5758", "name": "Suporte ou Cavalete do Cone", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "5757", "name": "Cone STS 40 Poulie", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "5754", "name": "Ponteira com Pino 8 p/ Tubo Octogonal", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "5755", "name": "Coroa LS40 p/ Tubo Octogonal", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "5756", "name": "Roda LSN 40 p/ Tubo Octogonal", "category": "Horizontais", "unit_price": 0.0},
+    {"code": "5476", "name": "Tubo Octogonal 40mm Alumínio", "category": "Horizontais", "unit_price": 0.0},
+]
+
+# Lista padrão de Rolô / TOP
+ROLO_COMPONENTS = [
     {"code": "4085", "name": "Tubo Alumínio 38mm", "category": "Tubos", "unit_price": 0.0},
     {"code": "5478", "name": "Tubo Alumínio 50mm", "category": "Tubos", "unit_price": 0.0},
     {"code": "6821", "name": "Tubo Alumínio 70mm", "category": "Tubos", "unit_price": 0.0},
@@ -10,53 +83,42 @@ COMPONENTS_CATALOG = [
     {"code": "5064", "name": "Ponta Oposta", "category": "Componentes", "unit_price": 0.0},
     {"code": "9864", "name": "Contador de Voltas (Tubo 38)", "category": "Componentes", "unit_price": 0.0},
     {"code": "9865", "name": "Contador de Voltas (Tubo 50)", "category": "Componentes", "unit_price": 0.0},
-
-    # Comandos (Ordem de cores: Branco / Preto / Bege / Cinza)
     {"code": "5060", "name": "Comando Pequeno (Branco)", "category": "Comandos", "unit_price": 0.0},
     {"code": "9758", "name": "Comando Pequeno (Preto)", "category": "Comandos", "unit_price": 0.0},
     {"code": "10187", "name": "Comando Pequeno (Bege)", "category": "Comandos", "unit_price": 0.0},
     {"code": "10154", "name": "Comando Pequeno (Cinza)", "category": "Comandos", "unit_price": 0.0},
-    
     {"code": "5062", "name": "Comando Grande com Redução (Branco)", "category": "Comandos", "unit_price": 0.0},
     {"code": "10150", "name": "Comando Grande com Redução (Preto)", "category": "Comandos", "unit_price": 0.0},
     {"code": "10412", "name": "Comando Grande com Redução (Bege)", "category": "Comandos", "unit_price": 0.0},
     {"code": "10156", "name": "Comando Grande com Redução (Cinza)", "category": "Comandos", "unit_price": 0.0},
-
     {"code": "5061", "name": "Comando Grande sem Redução (Branco)", "category": "Comandos", "unit_price": 0.0},
     {"code": "10149", "name": "Comando Grande sem Redução (Preto)", "category": "Comandos", "unit_price": 0.0},
     {"code": "10163", "name": "Comando Grande sem Redução (Bege)", "category": "Comandos", "unit_price": 0.0},
     {"code": "10155", "name": "Comando Grande sem Redução (Cinza)", "category": "Comandos", "unit_price": 0.0},
-
-    # Correntes e Conectores
     {"code": "5093", "name": "Corrente Metal", "category": "Correntes", "unit_price": 0.0},
     {"code": "2012", "name": "Conector Nº 10 para Rolô", "category": "Correntes", "unit_price": 0.0},
     {"code": "3017", "name": "Corrente PVC (Branca)", "category": "Correntes", "unit_price": 0.0},
     {"code": "6009", "name": "Corrente PVC (Preta)", "category": "Correntes", "unit_price": 0.0},
     {"code": "10167", "name": "Corrente PVC (Bege)", "category": "Correntes", "unit_price": 0.0},
     {"code": "10138", "name": "Corrente PVC (Cinza)", "category": "Correntes", "unit_price": 0.0},
-
-    # Capas de Suporte (Branco / Preto / Bege / Cinza)
     {"code": "5069", "name": "Capa Rolô Suporte Curto (Branca)", "category": "Capas", "unit_price": 0.0},
     {"code": "9760", "name": "Capa Rolô Suporte Curto (Preta)", "category": "Capas", "unit_price": 0.0},
     {"code": "10166", "name": "Capa Rolô Suporte Curto (Bege)", "category": "Capas", "unit_price": 0.0},
     {"code": "10161", "name": "Capa Rolô Suporte Curto (Cinza)", "category": "Capas", "unit_price": 0.0},
-
-    # Suportes (Branco / Preto / Bege / Cinza)
     {"code": "5065", "name": "Suporte Rolô Curto Ponta Oposta (Branco)", "category": "Suportes", "unit_price": 0.0},
     {"code": "9762", "name": "Suporte Rolô Curto Ponta Oposta (Preto)", "category": "Suportes", "unit_price": 0.0},
     {"code": "10165", "name": "Suporte Rolô Curto Ponta Oposta (Bege)", "category": "Suportes", "unit_price": 0.0},
     {"code": "10158", "name": "Suporte Rolô Curto Ponta Oposta (Cinza)", "category": "Suportes", "unit_price": 0.0},
-
-    # Bandô e Perfis Alumínio / PVC
     {"code": "4119", "name": "Bandô Alumínio (Branco)", "category": "Bandô", "unit_price": 0.0},
     {"code": "5747", "name": "Bandô Alumínio (Preto)", "category": "Bandô", "unit_price": 0.0},
     {"code": "9804", "name": "Bandô Alumínio (Bege)", "category": "Bandô", "unit_price": 0.0},
     {"code": "10022", "name": "Bandô Alumínio (Cinza)", "category": "Bandô", "unit_price": 0.0},
-
-    # Kits de Instalação e Acessórios
     {"code": "4511", "name": "Garra de Instalação", "category": "Instalação", "unit_price": 0.0},
     {"code": "1708", "name": "Bucha Plástica D8", "category": "Instalação", "unit_price": 0.0},
     {"code": "6365", "name": "Parafuso 5,5 x 75", "category": "Instalação", "unit_price": 0.0},
     {"code": "4507", "name": "Suporte p/ Instalação L4x8", "category": "Instalação", "unit_price": 0.0},
     {"code": "1770", "name": "Parafuso 4,8 x 13", "category": "Instalação", "unit_price": 0.0},
 ]
+
+# LISTA COMPLETA INTEGRADA QUE É IMPORTADA NOS OUTROS ARQUIVOS
+COMPONENTS_CATALOG = ROLO_COMPONENTS + HORIZONTAL_COMPONENTS
