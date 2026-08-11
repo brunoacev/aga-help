@@ -65,7 +65,7 @@ class MaterialsView(ft.Container):
                 ft.Container(
                     content=column_control,
                     expand=True,
-                    height=420 # Altura ajustada com scroll para evitar esticar a tela
+                    height=420
                 )
             ], spacing=6)
         )
@@ -83,14 +83,15 @@ class MaterialsView(ft.Container):
 
             item_card = self._create_material_item_card(code, name)
 
-            if "top" in category or "comando" in category or "suporte" in category or "rolo" in category:
-                self.col_top.controls.append(item_card)
-            elif "horizontal" in category or "lâmina" in category or "lamina" in category:
+            # LÓGICA DE DISTRIBUIÇÃO CORRIGIDA:
+            if "horizonta" in category or "horizontal" in category or "lâmina" in category or "lamina" in category:
                 self.col_horizontals.controls.append(item_card)
             elif "vertical" in category or "tecidos" in category:
                 self.col_verticals.controls.append(item_card)
             elif "perfil" in category or "tubo" in category or "bandô" in category or "bando" in category or "trilho" in category:
                 self.col_profiles.controls.append(item_card)
+            elif "top" in category or "comando" in category or "suporte" in category or "rolo" in category:
+                self.col_top.controls.append(item_card)
             else:
                 self.col_top.controls.append(item_card)
 
