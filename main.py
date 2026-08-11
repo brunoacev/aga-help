@@ -9,6 +9,7 @@ from core.database import (
 from components.kanban_column import KanbanColumn
 from components.quick_order_bar import QuickOrderBar
 from components.sidebar import Sidebar
+from views.materials_view import MaterialsView
 
 STAGES = ["Orçamento", "Produção", "Pronto", "Faturado"]
 
@@ -18,6 +19,18 @@ STAGE_COLORS = {
     "Pronto": colors.COLOR_PRONTO,
     "Faturado": colors.COLOR_FATURADO,
 }
+
+def main(page: ft.Page):
+    # Configurações da página...
+    page.title = "AGA HELP - Gestão de Pedidos e Materiais"
+    
+    # Instância da nova tela
+    materials_view = MaterialsView()
+
+    # Adicione a exibição da tela na árvore de controles do Flet conforme o menu/navegação da sua aplicação
+    page.add(materials_view)
+
+ft.app(target=main)
 
 def open_native_file_picker():
     root = Tk()
