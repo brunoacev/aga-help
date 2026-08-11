@@ -4,6 +4,13 @@ from core import colors
 from core.components_data import COMPONENTS_CATALOG
 from core.database import add_order, search_reseller_profiles, get_profile_by_exact_name, generate_random_profile
 
+def get_alignment_center():
+    if hasattr(ft, "Alignment"):
+        return ft.Alignment(0, 0)
+    if hasattr(ft, "alignment") and hasattr(ft.alignment, "CENTER"):
+        return ft.alignment.CENTER
+    return "center"
+
 def make_padding_symmetric(horizontal=0, vertical=0):
     if hasattr(ft, "Padding"):
         return ft.Padding(horizontal, vertical, horizontal, vertical)
@@ -25,7 +32,6 @@ class QuickOrderBar(ft.Container):
         self._is_updating = False
         self.selected_components = []
 
-        # Padronização rigorosa para todos os inputs
         input_style = dict(
             height=45,
             content_padding=make_padding_symmetric(horizontal=10, vertical=0),
@@ -63,13 +69,9 @@ class QuickOrderBar(ft.Container):
             visible=False
         )
 
-<<<<<<< HEAD
-        # --- BOX 2: ESPECIFICAÇÕES (LINHA 1: SERVIÇO, Nº PEDIDO, MEDIDAS, PRAZO, BOTÃO) ---
-=======
         # --- BOX 2: ESPECIFICAÇÃO DO PEDIDO ---
         self.txt_order_num = ft.TextField(label="Nº Pedido *", input_filter=digits_only_filter, keyboard_type=ft.KeyboardType.NUMBER, **input_style)
         
->>>>>>> b1a540b (feat(quick_order): reestrutura formulario em 4 boxes e integra catalogo de componentes AGATEK)
         self.dd_service_type = ft.Dropdown(
             label="Tipo de Serviço *",
             value="componentes",
@@ -81,13 +83,6 @@ class QuickOrderBar(ft.Container):
             **input_style
         )
 
-<<<<<<< HEAD
-        self.txt_order_num = ft.TextField(label="Nº Pedido *", input_filter=digits_only_filter, keyboard_type=ft.KeyboardType.NUMBER, **input_style)
-        self.txt_width = ft.TextField(label="Largura (m) *", hint_text="2.50", value="2.50", input_filter=decimal_filter, **input_style)
-        self.txt_height = ft.TextField(label="Altura (m) *", hint_text="2.80", value="2.80", input_filter=decimal_filter, **input_style)
-        
-=======
->>>>>>> b1a540b (feat(quick_order): reestrutura formulario em 4 boxes e integra catalogo de componentes AGATEK)
         self.dd_deadline_days = ft.Dropdown(
             label="Prazo *",
             value="3",
@@ -95,17 +90,6 @@ class QuickOrderBar(ft.Container):
             text_size=12,
             **input_style
         )
-<<<<<<< HEAD
-
-        btn_icon = getattr(ft.Icons, "ADD_ROUNDED", None) or getattr(ft.Icons, "ADD", None) or "add"
-        self.btn_add = ft.IconButton(
-            icon=btn_icon,
-            icon_color=colors.TEXT_PRIMARY,
-            bgcolor=colors.PRIMARY,
-            icon_size=20,
-            width=38,
-            height=38,
-=======
 
         # --- BOX 3: ADIÇÃO DE COMPONENTES ---
         self.txt_component_search = ft.TextField(
@@ -133,7 +117,7 @@ class QuickOrderBar(ft.Container):
             padding=6
         )
 
-        # --- BOX 4: ESPECIFICAÇÃO DO SERVIÇO (PERMANENTE) ---
+        # --- BOX 4: ESPECIFICAÇÃO DO SERVIÇO ---
         self.txt_num_order = ft.TextField(label="Pedido Original", hint_text="Ex: 333333", input_filter=decimal_filter, **input_style)
         self.txt_width = ft.TextField(label="Largura (m)", hint_text="Ex: 2.50", input_filter=decimal_filter, **input_style)
         self.txt_height = ft.TextField(label="Altura (m)", hint_text="Ex: 2.80", input_filter=decimal_filter, **input_style)
@@ -149,7 +133,6 @@ class QuickOrderBar(ft.Container):
         self.btn_generate_order = ft.ElevatedButton(
             "Gerar Ordem de Serviço",
             icon=getattr(ft.Icons, "CHECK_ROUNDED", None) or "check",
->>>>>>> b1a540b (feat(quick_order): reestrutura formulario em 4 boxes e integra catalogo de componentes AGATEK)
             style=ft.ButtonStyle(
                 bgcolor=colors.PRIMARY,
                 color=colors.TEXT_PRIMARY,
@@ -160,17 +143,6 @@ class QuickOrderBar(ft.Container):
             on_click=self._save
         )
 
-<<<<<<< HEAD
-        # --- BOX 2: ESPECIFICAÇÕES (LINHA 2: DESCRIÇÃO EXTENSA LOGO ABAIXO) ---
-        self.txt_description = ft.TextField(
-            label="Descrição Detalhada / Especificações do Serviço *", 
-            hint_text="Ex: Tecido Voil Flame com bainha de 10cm...", 
-            value="Tecido Voil Flame com bainha dupla e trilho suíço",
-            **input_style
-        )
-
-=======
->>>>>>> b1a540b (feat(quick_order): reestrutura formulario em 4 boxes e integra catalogo de componentes AGATEK)
         self.lbl_error = ft.Text("", size=11, color="#F85149", visible=False)
         border_all = ft.Border.all(1, colors.BORDER_COLOR) if hasattr(ft, "Border") else ft.border.all(1, colors.BORDER_COLOR)
 
@@ -191,37 +163,13 @@ class QuickOrderBar(ft.Container):
             ], spacing=8)
         )
 
-<<<<<<< HEAD
-        # 2. CONTAINER ESPECIFICAÇÕES DO PEDIDO (GRID HARMONIOSO DE 2 LINHAS)
-        box_budget = ft.Container(
-=======
         # 2. CONTAINER ESPECIFICAÇÃO DO PEDIDO
         box_order = ft.Container(
->>>>>>> b1a540b (feat(quick_order): reestrutura formulario em 4 boxes e integra catalogo de componentes AGATEK)
             bgcolor=colors.BG_SURFACE,
             border=border_all,
             border_radius=8,
             padding=10,
             content=ft.Column([
-<<<<<<< HEAD
-                ft.Text("2. ESPECIFICAÇÕES DO PEDIDO", size=10, weight=ft.FontWeight.BOLD, color=colors.PRIMARY),
-                
-                # Linha 1: Serviço, Nº Pedido, Medidas, Prazo e Ação
-                ft.ResponsiveRow([
-                    ft.Container(self.dd_service_type, col={"sm": 12, "md": 3}),
-                    ft.Container(self.txt_order_num, col={"sm": 6, "md": 2}),
-                    ft.Container(self.txt_width, col={"sm": 6, "md": 2}),
-                    ft.Container(self.txt_height, col={"sm": 6, "md": 2}),
-                    ft.Container(self.dd_deadline_days, col={"sm": 10, "md": 2}),
-                    ft.Container(self.btn_add, col={"sm": 2, "md": 1}),
-                ], run_spacing=8, spacing=10),
-                
-                # Linha 2: Descrição Detalhada
-                ft.ResponsiveRow([
-                    ft.Container(self.txt_description, col={"sm": 12, "md": 12})
-                ], run_spacing=8, spacing=15)
-            ], spacing=25)
-=======
                 ft.Text("2. ESPECIFICAÇÃO DO PEDIDO", size=10, weight=ft.FontWeight.BOLD, color=colors.PRIMARY),
                 ft.ResponsiveRow([
                     ft.Container(self.txt_order_num, col={"sm": 12, "md": 4}),
@@ -229,7 +177,6 @@ class QuickOrderBar(ft.Container):
                     ft.Container(self.dd_deadline_days, col={"sm": 12, "md": 4}),
                 ], run_spacing=8, spacing=8, vertical_alignment=ft.CrossAxisAlignment.CENTER)
             ], spacing=8)
->>>>>>> b1a540b (feat(quick_order): reestrutura formulario em 4 boxes e integra catalogo de componentes AGATEK)
         )
 
         # 3. CONTAINER ADIÇÃO DE COMPONENTES
@@ -258,7 +205,7 @@ class QuickOrderBar(ft.Container):
             ], spacing=8)
         )
 
-        # 4. CONTAINER ESPECIFICAÇÃO DO SERVIÇO (PERMANENTEMENTE VISÍVEL)
+        # 4. CONTAINER ESPECIFICAÇÃO DO SERVIÇO
         box_service = ft.Container(
             bgcolor=colors.BG_SURFACE,
             border=border_all,
@@ -282,7 +229,7 @@ class QuickOrderBar(ft.Container):
         self._render_components_list(COMPONENTS_CATALOG[:2])
         self._render_selected_items()
 
-        # MONTAGEM PRINCIPAL: Todos os 4 Boxes visíveis em ordem sequencial
+        # MONTAGEM PRINCIPAL
         super().__init__(
             content=ft.Column([
                 ft.Row([
@@ -297,18 +244,6 @@ class QuickOrderBar(ft.Container):
             ], spacing=10)
         )
 
-<<<<<<< HEAD
-    def _on_service_type_change(self, e):
-        if self.dd_service_type.value == "tecido":
-            self.txt_width.disabled = False
-            self.txt_height.disabled = False
-        else:
-            self.txt_width.disabled = True
-            self.txt_height.disabled = True
-            self.txt_description.value = f"Pedido padrão para {self.dd_service_type.value}"
-        self.update()
-
-=======
     def _is_meter_item(self, item):
         if "unit_type" in item:
             return item["unit_type"] == "meter"
@@ -470,7 +405,6 @@ class QuickOrderBar(ft.Container):
             )
             self.selected_items_column.controls.append(row)
 
->>>>>>> b1a540b (feat(quick_order): reestrutura formulario em 4 boxes e integra catalogo de componentes AGATEK)
     def _on_reseller_change(self, e):
         if self._is_updating:
             return
@@ -552,8 +486,6 @@ class QuickOrderBar(ft.Container):
             self.update()
             return
 
-<<<<<<< HEAD
-=======
         try:
             val_raw = (self.txt_value.value or "0").strip().replace("R$", "").replace(" ", "")
             if "," in val_raw:
@@ -562,7 +494,6 @@ class QuickOrderBar(ft.Container):
         except ValueError:
             val = 0.0
 
->>>>>>> b1a540b (feat(quick_order): reestrutura formulario em 4 boxes e integra catalogo de componentes AGATEK)
         now = datetime.now()
         today_str = now.strftime("%d/%m/%Y")
         days_count = int(self.dd_deadline_days.value)
@@ -574,7 +505,7 @@ class QuickOrderBar(ft.Container):
             reseller_name=self.txt_reseller.value.strip(),
             phone=self.txt_phone.value,
             address=self.txt_address.value,
-            value=0.0,
+            value=val,
             entry_date=today_str,
             deadline_date=deadline_str,
             description=self.txt_description.value.strip(),
@@ -592,15 +523,10 @@ class QuickOrderBar(ft.Container):
         self.txt_phone.value = ""
         self.txt_address.value = ""
         self.txt_reseller.value = ""
-<<<<<<< HEAD
-        self.txt_width.value = "2.50"
-        self.txt_height.value = "2.80"
-=======
         self.txt_num_order.value = ""
         self.txt_width.value = ""
         self.txt_height.value = ""
         self.txt_value.value = ""
->>>>>>> b1a540b (feat(quick_order): reestrutura formulario em 4 boxes e integra catalogo de componentes AGATEK)
         self.dd_deadline_days.value = "3"
         self.dd_service_type.value = "componentes"
         self.txt_description.value = ""
