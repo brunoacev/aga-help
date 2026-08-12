@@ -38,7 +38,9 @@ class WhatsAppView(ft.Container):
         self._last_qr_src = ""
         self._sync_index: dict[str, int] = {}
         self._pending_optimistic: dict[str, str] = {}
+        self._selected_is_group = False
         self._chat_filter = ""
+        self._group_icon = getattr(ft.Icons, "GROUPS", None) or getattr(ft.Icons, "SUPERGROUP", None) or "groups"
 
         self.node_alert = ft.Container(
             visible=False,
@@ -136,11 +138,18 @@ class WhatsAppView(ft.Container):
             **field_style(),
         )
         self.conversations_column = ft.Column(spacing=S1, scroll=ft.ScrollMode.AUTO, expand=True)
-        self.chat_header = ft.Text(
+        self.chat_header_icon = ft.Icon(self._group_icon, size=20, color=colors.WA_ACCENT, visible=False)
+        self.chat_header_text = ft.Text(
             "Selecione uma conversa",
             size=FONT_BODY,
             color=colors.WA_LIST_NAME,
             weight=ft.FontWeight.W_600,
+            expand=True,
+        )
+        self.chat_header = ft.Row(
+            [self.chat_header_icon, self.chat_header_text],
+            spacing=S2,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
         )
         self.messages_list = ft.ListView(
             expand=True,
@@ -349,8 +358,10 @@ class WhatsAppView(ft.Container):
             for item in conversations
             if self._chat_filter in item.name.lower()
             or self._chat_filter in item.phone.lower()
+            or self._chat_filter in (item.group_name or "").lower()
             or self._chat_filter in format_br_phone(item.phone).lower()
             or self._chat_filter in item.last_message.lower()
+            or (item.is_group and self._chat_filter in "grupo")
         ]
 
     def _render_conversation_list(self) -> None:
@@ -380,10 +391,34 @@ class WhatsAppView(ft.Container):
         if self.selected_conversation_id not in valid_ids:
             self._select_conversation(conversations[0].id, update=False)
 
+    def _conversation_title(self, conversation: WhatsAppConversation) -> str:
+        if conversation.is_group:
+            return conversation.group_name or conversation.name or "Grupo"
+        return conversation.name or format_br_phone(conversation.phone) or conversation.phone
+
+    def _conversation_subtitle(self, conversation: WhatsAppConversation) -> str:
+        if conversation.is_group:
+            return "Grupo"
+        formatted = format_br_phone(conversation.phone) or conversation.phone
+        if conversation.name and formatted and conversation.name != formatted:
+            return formatted
+        return formatted or conversation.name
+
     def _build_conversation_tile(self, conversation: WhatsAppConversation) -> ft.Container:
         is_active = conversation.id == self.selected_conversation_id
         preview_color = colors.WA_LIST_NAME if conversation.unread else colors.WA_LIST_PREVIEW
+        title = self._conversation_title(conversation)
+        subtitle = self._conversation_subtitle(conversation)
         trailing = []
+        if conversation.is_group:
+            trailing.append(
+                ft.Container(
+                    content=ft.Text("Grupo", size=10, color=colors.WA_BUBBLE_TEXT),
+                    bgcolor=colors.WA_INCOMING_BUBBLE,
+                    border_radius=10,
+                    padding=make_padding_symmetric(horizontal=6, vertical=2),
+                )
+            )
         if conversation.unread:
             trailing.append(
                 ft.Container(
@@ -393,29 +428,39 @@ class WhatsAppView(ft.Container):
                     padding=make_padding_symmetric(horizontal=6, vertical=2),
                 )
             )
+        avatar_control = (
+            ft.CircleAvatar(
+                foreground_image_src=conversation.avatar or None,
+                content=ft.Icon(self._group_icon, color=colors.WA_BUBBLE_TEXT, size=18),
+                bgcolor=colors.WA_INCOMING_BUBBLE,
+                radius=18,
+            )
+            if conversation.is_group
+            else ft.CircleAvatar(
+                content=ft.Text(
+                    (title[:1] or "?").upper(),
+                    color=colors.WA_BUBBLE_TEXT,
+                    weight=ft.FontWeight.W_600,
+                ),
+                bgcolor=colors.WA_INCOMING_BUBBLE,
+                radius=18,
+            )
+        )
         return ft.Container(
             content=ft.Row(
                 [
-                    ft.CircleAvatar(
-                        content=ft.Text(
-                            (conversation.name[:1] or "?").upper(),
-                            color=colors.WA_BUBBLE_TEXT,
-                            weight=ft.FontWeight.W_600,
-                        ),
-                        bgcolor=colors.WA_INCOMING_BUBBLE,
-                        radius=18,
-                    ),
+                    avatar_control,
                     ft.Column(
                         [
                             ft.Text(
-                                conversation.name,
+                                title,
                                 size=FONT_BODY,
                                 weight=ft.FontWeight.W_600,
                                 color=colors.WA_LIST_NAME,
                                 overflow=ft.TextOverflow.ELLIPSIS,
                             ),
                             ft.Text(
-                                format_br_phone(conversation.phone) or conversation.phone,
+                                subtitle,
                                 size=10,
                                 color=colors.WA_META_INCOMING,
                                 overflow=ft.TextOverflow.ELLIPSIS,
@@ -442,6 +487,15 @@ class WhatsAppView(ft.Container):
             on_click=lambda _, cid=conversation.id: self._select_conversation(cid),
         )
 
+    def _sender_label(self, message: WhatsAppMessage) -> str:
+        if message.sender_name:
+            return message.sender_name
+        if message.sender_phone:
+            return format_br_phone(message.sender_phone) or message.sender_phone
+        if message.sender_jid:
+            return format_br_phone(message.sender_jid) or message.sender_jid
+        return ""
+
     def _build_message_bubble(self, message: WhatsAppMessage) -> ft.Control:
         outgoing = message.from_me
         bubble_bg = colors.WA_OUTGOING_BUBBLE if outgoing else colors.WA_INCOMING_BUBBLE
@@ -462,19 +516,35 @@ class WhatsAppView(ft.Container):
         if status_icon:
             footer_controls.append(status_icon)
 
+        bubble_lines: list[ft.Control] = []
+        if self._selected_is_group and not outgoing:
+            sender_label = self._sender_label(message)
+            if sender_label:
+                bubble_lines.append(
+                    ft.Text(
+                        sender_label,
+                        size=10,
+                        color=colors.WA_ACCENT,
+                        weight=ft.FontWeight.W_600,
+                    )
+                )
+        bubble_lines.extend(
+            [
+                ft.Text(
+                    message.text,
+                    size=FONT_BODY,
+                    color=colors.WA_BUBBLE_TEXT,
+                    selectable=True,
+                ),
+                ft.Row(footer_controls, spacing=S1, alignment=ft.MainAxisAlignment.END),
+            ]
+        )
+
         return ft.Row(
             [
                 ft.Container(
                     content=ft.Column(
-                        [
-                            ft.Text(
-                                message.text,
-                                size=FONT_BODY,
-                                color=colors.WA_BUBBLE_TEXT,
-                                selectable=True,
-                            ),
-                            ft.Row(footer_controls, spacing=S1, alignment=ft.MainAxisAlignment.END),
-                        ],
+                        bubble_lines,
                         spacing=S1,
                         tight=True,
                     ),
@@ -553,9 +623,14 @@ class WhatsAppView(ft.Container):
         if not conversation:
             return
 
-        self.chat_header.value = (
-            f"{conversation.name}  ·  {format_br_phone(conversation.phone) or conversation.phone}"
-        )
+        self._selected_is_group = conversation.is_group
+        self.chat_header_icon.visible = conversation.is_group
+        if conversation.is_group:
+            self.chat_header_text.value = self._conversation_title(conversation)
+        else:
+            title = conversation.name or format_br_phone(conversation.phone) or conversation.phone
+            phone = format_br_phone(conversation.phone) or conversation.phone
+            self.chat_header_text.value = f"{title}  ·  {phone}" if phone else title
         self.controller.mark_conversation_read(conversation_id)
         self._reset_chat_messages(conversation_id)
         self._set_compose_enabled(self._last_status == STATUS_CONNECTED)
@@ -613,6 +688,7 @@ class WhatsAppView(ft.Container):
         self._last_qr_src = ""
         self._sync_index.clear()
         self._pending_optimistic.clear()
+        self._selected_is_group = False
         self.selected_conversation_id = None
         self.messages_list.controls.clear()
         self._set_compose_enabled(False)

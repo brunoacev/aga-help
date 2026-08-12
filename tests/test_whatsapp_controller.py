@@ -22,17 +22,61 @@ def test_list_conversations_from_bridge():
     controller = WhatsAppController()
     controller.client = MagicMock()
     controller.client.list_chats.return_value = [
-            {
-                "id": "5585999999999@s.whatsapp.net",
-                "name": "Cliente Teste",
-                "phone": "+5585999999999",
-                "last_message": "Olá",
-                "unread": 1,
-            }
+        {
+            "id": "5585999999999@s.whatsapp.net",
+            "name": "Cliente Teste",
+            "phone": "+5585999999999",
+            "last_message": "Olá",
+            "unread": 1,
+            "is_group": False,
+        }
     ]
     conversations = controller.list_conversations()
     assert len(conversations) == 1
     assert conversations[0].phone == "+55 (85) 99999-9999"
+    assert conversations[0].is_group is False
+
+
+def test_list_group_conversations_from_bridge():
+    controller = WhatsAppController()
+    controller.client = MagicMock()
+    controller.client.list_chats.return_value = [
+        {
+            "id": "120363012345678901@g.us",
+            "name": "Equipe Agatek",
+            "phone": "",
+            "group_name": "Equipe Agatek",
+            "last_message": "Bom dia",
+            "unread": 0,
+            "is_group": True,
+            "avatar": "https://example.com/group.jpg",
+        }
+    ]
+    conversations = controller.list_conversations()
+    assert len(conversations) == 1
+    assert conversations[0].is_group is True
+    assert conversations[0].group_name == "Equipe Agatek"
+    assert conversations[0].name == "Equipe Agatek"
+    assert conversations[0].phone == ""
+
+
+def test_get_group_messages_with_sender():
+    controller = WhatsAppController()
+    controller.client = MagicMock()
+    controller.client.list_messages.return_value = [
+        {
+            "from_me": False,
+            "text": "Oi pessoal",
+            "time": "10:00",
+            "sender_name": "Maria",
+            "sender_phone": "+5585999999999",
+            "sender_jid": "5585999999999@s.whatsapp.net",
+        },
+    ]
+    messages = controller.get_messages("120363012345678901@g.us")
+    assert len(messages) == 1
+    assert messages[0].sender_name == "Maria"
+    assert messages[0].sender_phone == "+55 (85) 99999-9999"
 
 
 def test_get_messages_from_bridge():

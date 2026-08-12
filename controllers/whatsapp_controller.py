@@ -28,6 +28,9 @@ class WhatsAppConversation:
     phone: str
     last_message: str
     unread: int = 0
+    is_group: bool = False
+    group_name: str = ""
+    avatar: str = ""
 
 
 @dataclass(frozen=True)
@@ -39,6 +42,9 @@ class WhatsAppMessage:
     time: str
     timestamp: int = 0
     msg_type: str = "text"
+    sender_name: str = ""
+    sender_phone: str = ""
+    sender_jid: str = ""
 
 
 class WhatsAppController:
@@ -103,14 +109,20 @@ class WhatsAppController:
             return []
         conversations: list[WhatsAppConversation] = []
         for row in rows:
+            is_group = bool(row.get("is_group")) or str(row.get("id") or "").endswith("@g.us")
             raw_phone = str(row.get("phone") or row.get("id") or "")
+            group_name = str(row.get("group_name") or row.get("name") or "Grupo")
+            display_name = group_name if is_group else str(row.get("name") or "Contato")
             conversations.append(
                 WhatsAppConversation(
                     id=str(row.get("id") or ""),
-                    name=str(row.get("name") or "Contato"),
-                    phone=format_br_phone(raw_phone),
+                    name=display_name,
+                    phone="" if is_group else format_br_phone(raw_phone),
                     last_message=str(row.get("last_message") or ""),
                     unread=int(row.get("unread") or 0),
+                    is_group=is_group,
+                    group_name=group_name if is_group else "",
+                    avatar=str(row.get("avatar") or ""),
                 )
             )
         return conversations
@@ -124,6 +136,7 @@ class WhatsAppController:
             return []
         messages: list[WhatsAppMessage] = []
         for row in rows:
+            sender_phone_raw = str(row.get("sender_phone") or "")
             messages.append(
                 WhatsAppMessage(
                     from_me=bool(row.get("from_me")),
@@ -131,6 +144,9 @@ class WhatsAppController:
                     time=str(row.get("time") or ""),
                     timestamp=int(row.get("timestamp") or 0),
                     msg_type=str(row.get("type") or "text"),
+                    sender_name=str(row.get("sender_name") or ""),
+                    sender_phone=format_br_phone(sender_phone_raw) if sender_phone_raw else "",
+                    sender_jid=str(row.get("sender_jid") or ""),
                 )
             )
         messages.sort(key=lambda item: item.timestamp)

@@ -27,6 +27,11 @@ let starting = false;
 const chatStore = new Map();
 const messageStore = new Map();
 const messageKeys = new Map();
+const groupMetadataCache = new Map();
+
+function isGroupJid(jid) {
+  return Boolean(jid && jid.endsWith("@g.us"));
+}
 
 function formatPhone(jid) {
   if (!jid) return "";
@@ -62,6 +67,7 @@ function parseMessage(msg) {
   const text = extractMessageText(msg);
   const tsRaw = msg.messageTimestamp ? Number(msg.messageTimestamp) : Date.now() / 1000;
   const ts = new Date(tsRaw * (tsRaw > 1e12 ? 1 : 1000));
+  const participant = msg.key?.participant || "";
   return {
     id: msg.key?.id || "",
     from_me: Boolean(msg.key?.fromMe),
@@ -69,7 +75,39 @@ function parseMessage(msg) {
     time: ts.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
     timestamp: ts.getTime(),
     type: msg.message ? Object.keys(msg.message)[0] || "text" : "text",
+    sender_jid: participant,
+    sender_name: msg.pushName || "",
+    sender_phone: participant ? formatPhone(participant) : "",
   };
+}
+
+async function getGroupMeta(jid) {
+  if (!isGroupJid(jid)) return null;
+  if (groupMetadataCache.has(jid)) {
+    return groupMetadataCache.get(jid);
+  }
+  if (!sock) {
+    return { subject: "Grupo", avatar: "" };
+  }
+  try {
+    const meta = await sock.groupMetadata(jid);
+    let avatar = "";
+    try {
+      avatar = await sock.profilePictureUrl(jid, "image");
+    } catch (_) {
+      /* avatar opcional */
+    }
+    const entry = {
+      subject: meta.subject || "Grupo",
+      avatar,
+    };
+    groupMetadataCache.set(jid, entry);
+    return entry;
+  } catch (_) {
+    const fallback = { subject: "Grupo", avatar: "" };
+    groupMetadataCache.set(jid, fallback);
+    return fallback;
+  }
 }
 
 function sortMessages(messages) {
@@ -106,19 +144,36 @@ function appendMessage(msg) {
   return parsed;
 }
 
-function formatChat(chat) {
+async function formatChat(chat) {
   const last =
     chat.conversation ||
     chat.lastMessage?.conversation ||
     chat.lastMessage?.extendedTextMessage?.text ||
     "";
+  const isGroup = isGroupJid(chat.id);
+  let name = chat.name || "";
+  let groupName = "";
+  let avatar = "";
+
+  if (isGroup) {
+    const meta = await getGroupMeta(chat.id);
+    groupName = meta?.subject || chat.subject || chat.name || "Grupo";
+    name = groupName;
+    avatar = meta?.avatar || "";
+  } else {
+    name = chat.name || formatPhone(chat.id);
+  }
+
   return {
     id: chat.id,
-    name: chat.name || formatPhone(chat.id),
-    phone: formatPhone(chat.id),
+    name,
+    phone: isGroup ? "" : formatPhone(chat.id),
     last_message: last,
     unread: chat.unreadCount || 0,
     timestamp: chat.conversationTimestamp || 0,
+    is_group: isGroup,
+    group_name: isGroup ? groupName : "",
+    avatar,
   };
 }
 
@@ -146,6 +201,18 @@ function bindEvents(socket) {
   socket.ev.on("messages.upsert", ({ messages, type }) => {
     for (const msg of messages || []) {
       appendMessage(msg);
+    }
+  });
+
+  socket.ev.on("groups.update", (updates) => {
+    for (const update of updates || []) {
+      const jid = update.id;
+      if (!isGroupJid(jid)) continue;
+      const prev = groupMetadataCache.get(jid) || { subject: "Grupo", avatar: "" };
+      groupMetadataCache.set(jid, {
+        ...prev,
+        subject: update.subject || prev.subject,
+      });
     }
   });
 }
@@ -200,6 +267,7 @@ async function connectWhatsApp() {
       chatStore.clear();
       messageStore.clear();
       messageKeys.clear();
+      groupMetadataCache.clear();
       if (!loggedOut) {
         setTimeout(connectWhatsApp, 2500);
       }
@@ -227,16 +295,20 @@ app.get("/qr", (_req, res) => {
   res.json({ qr: currentQr });
 });
 
-app.get("/chats", (_req, res) => {
+app.get("/chats", async (_req, res) => {
   if (status !== "CONNECTED") {
     return res.json({ chats: [] });
   }
-  const chats = Array.from(chatStore.values())
-    .filter((chat) => chat.id && !chat.id.includes("@broadcast"))
-    .sort((a, b) => (b.conversationTimestamp || 0) - (a.conversationTimestamp || 0))
-    .slice(0, 100)
-    .map(formatChat);
-  res.json({ chats });
+  try {
+    const rows = Array.from(chatStore.values())
+      .filter((chat) => chat.id && !chat.id.includes("@broadcast"))
+      .sort((a, b) => (b.conversationTimestamp || 0) - (a.conversationTimestamp || 0))
+      .slice(0, 100);
+    const chats = await Promise.all(rows.map((chat) => formatChat(chat)));
+    res.json({ chats });
+  } catch (error) {
+    res.status(500).json({ chats: [], error: String(error.message || error) });
+  }
 });
 
 app.get("/messages", (req, res) => {
@@ -307,6 +379,7 @@ app.post("/logout", async (_req, res) => {
     chatStore.clear();
     messageStore.clear();
     messageKeys.clear();
+    groupMetadataCache.clear();
     if (fs.existsSync(AUTH_DIR)) {
       fs.rmSync(AUTH_DIR, { recursive: true, force: true });
     }
