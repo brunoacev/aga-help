@@ -8,7 +8,7 @@ from core import colors
 from core.components_data import COMPONENTS_CATALOG, FILTER_CATEGORY_ALL, FILTER_CATEGORY_OPTIONS, OFFICIAL_CATEGORIES
 from core.services.catalog_service import categorize_materials, filter_components
 from utils.flet_compat import border_all, dropdown_on_select, make_padding_symmetric, safe_update
-from utils.ui_theme import FONT_BODY, FONT_CAPTION, RADIUS, S2, S3, S4, dropdown_style, field_style, page_container, page_header, text_caption, text_section_heading
+from utils.ui_theme import FONT_BODY, FONT_CAPTION, RADIUS, S1, S2, S3, S4, dropdown_style, field_style, page_container, page_header, text_caption, text_section_heading
 
 GRID_COL = {"sm": 12, "md": 4}
 SUMMARY_BOX_TITLE = "Resumo do Catálogo"
