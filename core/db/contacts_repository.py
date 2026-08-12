@@ -79,6 +79,34 @@ def search_contacts(query: str, limit: int = 3) -> list[dict]:
         return [dict(row) for row in rows]
 
 
+def list_contacts(query: str = "", *, limit: int = 500) -> list[dict]:
+    """Lista contatos da agenda, com filtro opcional por nome ou telefone."""
+    clean_q = query.strip()
+    with get_connection() as conn:
+        conn.row_factory = _row_factory
+        if clean_q:
+            pattern = f"%{clean_q}%"
+            rows = conn.execute(
+                """
+                SELECT name, phone, address, created_at FROM contacts
+                WHERE name LIKE ? OR phone LIKE ?
+                ORDER BY name COLLATE NOCASE
+                LIMIT ?
+                """,
+                (pattern, pattern, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT name, phone, address, created_at FROM contacts
+                ORDER BY name COLLATE NOCASE
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+
 def get_contact_by_name(name: str) -> dict | None:
     """Busca contato exato por nome."""
     clean_q = name.strip()

@@ -63,3 +63,8 @@ def get_profile_by_exact_name(reseller_name: str) -> dict | None:
 def clear_all_contacts() -> None:
     """Remove todos os contatos."""
     contacts_repository.clear_all_contacts()
+
+
+def list_agenda_contacts(query: str = "", *, limit: int = 500) -> list[dict]:
+    """Lista contatos da agenda para exibição na view, com busca opcional."""
+    return contacts_repository.list_contacts(query, limit=limit)
