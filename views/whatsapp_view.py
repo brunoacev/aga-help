@@ -394,40 +394,23 @@ class WhatsAppView(ft.Container):
     def _conversation_title(self, conversation: WhatsAppConversation) -> str:
         if conversation.is_group:
             return conversation.group_name or conversation.name or "Grupo"
-        return conversation.name or format_br_phone(conversation.phone) or conversation.phone
-
-    def _conversation_subtitle(self, conversation: WhatsAppConversation) -> str:
-        if conversation.is_group:
-            return "Grupo"
-        formatted = format_br_phone(conversation.phone) or conversation.phone
-        if conversation.name and formatted and conversation.name != formatted:
-            return formatted
-        return formatted or conversation.name
+        formatted = format_br_phone(conversation.phone) or format_br_phone(conversation.id)
+        name = (conversation.name or "").strip()
+        if name and "@" not in name:
+            name_digits = "".join(ch for ch in name if ch.isdigit())
+            phone_digits = "".join(ch for ch in (conversation.phone or conversation.id) if ch.isdigit())
+            if name_digits and name_digits == phone_digits:
+                return formatted or name
+            if format_br_phone(name) == formatted:
+                return formatted or name
+            return name
+        return formatted or "Contato"
 
     def _build_conversation_tile(self, conversation: WhatsAppConversation) -> ft.Container:
         is_active = conversation.id == self.selected_conversation_id
         preview_color = colors.WA_LIST_NAME if conversation.unread else colors.WA_LIST_PREVIEW
         title = self._conversation_title(conversation)
-        subtitle = self._conversation_subtitle(conversation)
-        trailing = []
-        if conversation.is_group:
-            trailing.append(
-                ft.Container(
-                    content=ft.Text("Grupo", size=10, color=colors.WA_BUBBLE_TEXT),
-                    bgcolor=colors.WA_INCOMING_BUBBLE,
-                    border_radius=10,
-                    padding=make_padding_symmetric(horizontal=6, vertical=2),
-                )
-            )
-        if conversation.unread:
-            trailing.append(
-                ft.Container(
-                    content=ft.Text(str(conversation.unread), size=10, color=colors.WA_BUBBLE_TEXT),
-                    bgcolor=colors.WA_ACCENT,
-                    border_radius=12,
-                    padding=make_padding_symmetric(horizontal=6, vertical=2),
-                )
-            )
+        preview = conversation.last_message or "Sem mensagens"
         avatar_control = (
             ft.CircleAvatar(
                 foreground_image_src=conversation.avatar or None,
@@ -460,13 +443,7 @@ class WhatsAppView(ft.Container):
                                 overflow=ft.TextOverflow.ELLIPSIS,
                             ),
                             ft.Text(
-                                subtitle,
-                                size=10,
-                                color=colors.WA_META_INCOMING,
-                                overflow=ft.TextOverflow.ELLIPSIS,
-                            ),
-                            ft.Text(
-                                conversation.last_message or "Sem mensagens",
+                                preview,
                                 size=FONT_CAPTION,
                                 color=preview_color,
                                 overflow=ft.TextOverflow.ELLIPSIS,
@@ -475,7 +452,6 @@ class WhatsAppView(ft.Container):
                         spacing=S1,
                         expand=True,
                     ),
-                    *trailing,
                 ],
                 spacing=S2,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
