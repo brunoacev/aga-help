@@ -12,23 +12,23 @@ APP_VERSION = "AGA HELP v1.0"
 
 NAV_SECTIONS: tuple[tuple[str, tuple[tuple[str, str, str, str], ...]], ...] = (
     (
-        "PRINCIPAL / OPERACIONAL",
+        "OPERACIONAL",
         (
-            ("kanban", "Quadro Kanban", "DASHBOARD_ROUNDED", "dashboard"),
-            ("add", "Cadastro Pedido", "ADD_BOX_ROUNDED", "add_box"),
+            ("add", "Novo Pedido", "ADD_SHOPPING_CART_ROUNDED", "add_shopping_cart"),
+            ("kanban", "Fluxo de Produção", "VIEW_WEEK_ROUNDED", "view_week"),
         ),
     ),
     (
-        "CADASTROS & GESTÃO",
+        "GESTÃO & RESULTADOS",
         (
-            ("materials", "Materiais", "INVENTORY_2_ROUNDED", "inventory_2"),
-            ("agenda", "Agenda de Contatos", "CONTACTS_ROUNDED", "contacts"),
+            ("commissions", "Desempenho & Comissões", "QUERY_STATS_ROUNDED", "query_stats"),
         ),
     ),
     (
-        "GESTÃO / OPERACIONAL",
+        "CADASTROS BASE",
         (
-            ("commissions", "Comissões", "PAYMENTS_ROUNDED", "payments"),
+            ("materials", "Catálogo de Materiais", "INVENTORY_2_OUTLINED", "inventory_2"),
+            ("agenda", "Agenda de Contatos", "CONTACTS_OUTLINED", "contacts"),
         ),
     ),
 )
