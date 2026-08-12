@@ -282,6 +282,7 @@ def icon_button(
     tooltip: str,
     on_click,
     size: int = 18,
+    disabled: bool = False,
 ) -> ft.IconButton:
     """IconButton com área de clique confortável."""
     return ft.IconButton(
@@ -289,6 +290,7 @@ def icon_button(
         icon_color=color,
         icon_size=size,
         tooltip=tooltip,
+        disabled=disabled,
         style=ft.ButtonStyle(
             padding=S2,
             shape=ft.RoundedRectangleBorder(radius=RADIUS) if hasattr(ft, "RoundedRectangleBorder") else None,

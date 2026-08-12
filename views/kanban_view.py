@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import flet as ft
 
+from controllers.order_billing_controller import (
+    can_delete_order,
+    can_move_order,
+    can_view_order_details,
+)
 from core import colors
-from core.services.order_service import delete_order, get_orders, update_order_status
+from core.services.order_service import complete_order_billing, delete_order, get_orders, update_order_status
 from components.kanban_column import KanbanColumn
 from components.order_details_dialog import show_order_items_dialog
-from utils.flet_compat import confirm_dialog
+from utils.flet_compat import confirm_dialog, show_snackbar
 from utils.ui_theme import S4, page_container, page_header
 
 
@@ -22,13 +27,18 @@ class KanbanView(ft.Container):
         stage_colors: dict[str, str],
         *,
         on_orders_changed=None,
+        is_master: bool = False,
     ):
         self.app_page = page
         self.stages = stages
         self.stage_colors = stage_colors
         self.on_orders_changed = on_orders_changed
+        self.is_master = is_master
         super().__init__(expand=True, bgcolor=colors.BG_PRIMARY)
         self.refresh()
+
+    def _find_order(self, order_id: int) -> dict | None:
+        return next((order for order in get_orders() if order.get("id") == order_id), None)
 
     def _notify_orders_changed(self) -> None:
         if self.on_orders_changed:
@@ -54,6 +64,8 @@ class KanbanView(ft.Container):
                     on_move_callback=self._move_order,
                     on_delete_callback=self._confirm_delete,
                     on_details_callback=self._show_order_details,
+                    on_complete_callback=self._complete_billing,
+                    is_master=self.is_master,
                     expand=True,
                 )
             )
@@ -77,14 +89,46 @@ class KanbanView(ft.Container):
             self.app_page.update()
 
     def _move_order(self, order_id: int, new_stage: str) -> None:
+        order = self._find_order(order_id)
+        if order and not can_move_order(order, is_master=self.is_master):
+            show_snackbar(
+                self.app_page,
+                "Pedido concluído no faturamento. Apenas administradores podem alterá-lo.",
+                success=False,
+            )
+            return
         update_order_status(order_id, new_stage)
         self.refresh()
         self._notify_orders_changed()
 
+    def _complete_billing(self, order_id: int) -> None:
+        order = self._find_order(order_id)
+        if not order:
+            return
+        complete_order_billing(order_id)
+        self.refresh()
+        self._notify_orders_changed()
+        show_snackbar(self.app_page, "Faturamento concluído com sucesso!", success=True)
+
     def _show_order_details(self, order: dict) -> None:
+        if not can_view_order_details(order, is_master=self.is_master):
+            show_snackbar(
+                self.app_page,
+                "Pedido concluído no faturamento. Detalhes bloqueados para usuários comuns.",
+                success=False,
+            )
+            return
         show_order_items_dialog(self.app_page, order)
 
     def _confirm_delete(self, order_id: int) -> None:
+        order = self._find_order(order_id)
+        if order and not can_delete_order(order, is_master=self.is_master):
+            show_snackbar(
+                self.app_page,
+                "Pedido concluído no faturamento. Exclusão bloqueada para usuários comuns.",
+                success=False,
+            )
+            return
         confirm_dialog(
             self.app_page,
             "Excluir pedido",

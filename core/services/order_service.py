@@ -85,6 +85,11 @@ def update_order_status(order_id: int, new_status: str) -> None:
     add_log("STATUS", f"Pedido #{order_id} movido para {new_status}.")
 
 
+def complete_order_billing(order_id: int) -> None:
+    """Confirma conclusão do faturamento na coluna Faturado."""
+    orders_repository.mark_order_billed(order_id, is_billed=True)
+
+
 def delete_order(order_id: int) -> None:
     """Remove pedido."""
     orders_repository.delete_order(order_id)

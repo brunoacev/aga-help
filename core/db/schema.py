@@ -64,5 +64,9 @@ def init_db() -> None:
                 conn.execute(f"ALTER TABLE orders ADD COLUMN {col} TEXT DEFAULT {default}")
             except sqlite3.OperationalError:
                 pass
+        try:
+            conn.execute("ALTER TABLE orders ADD COLUMN is_billed INTEGER NOT NULL DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
         backfill_order_timestamps()
         conn.commit()

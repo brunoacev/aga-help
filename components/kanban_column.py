@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import flet as ft
 
+from controllers.order_billing_controller import BILLED_STAGE, sort_faturado_orders
 from core import colors
 from components.order_card import OrderCard
 from utils.flet_compat import border_all, get_alignment_center, make_padding_symmetric
-from utils.ui_theme import FONT_LABEL, RADIUS, S1, S2, S3, S4, WEIGHT_LABEL
+from utils.ui_theme import FONT_CAPTION, FONT_LABEL, RADIUS, S1, S2, S3, S4, WEIGHT_LABEL
 
 
 class KanbanColumn(ft.Container):
@@ -23,6 +24,8 @@ class KanbanColumn(ft.Container):
         on_delete_callback,
         on_details_callback,
         *,
+        on_complete_callback=None,
+        is_master: bool = False,
         expand: bool | int = False,
     ):
         header = ft.Row(
@@ -61,33 +64,50 @@ class KanbanColumn(ft.Container):
             tight=True,
             horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
         )
-        for order in orders:
-            cards_list.controls.append(
-                ft.Container(
-                    content=OrderCard(
-                        order=order,
-                        stages=stages,
-                        on_move_callback=on_move_callback,
-                        on_delete_callback=on_delete_callback,
-                        on_details_callback=on_details_callback,
-                    ),
-                    padding=make_padding_symmetric(horizontal=S2),
-                )
-            )
 
-        if not orders:
-            cards_list.controls.append(
-                ft.Container(
-                    content=ft.Text(
-                        "Nenhum pedido nesta etapa",
-                        size=11,
-                        color=colors.TEXT_MUTED,
-                        text_align=ft.TextAlign.CENTER,
-                    ),
-                    padding=S4,
-                    alignment=get_alignment_center(),
+        if stage == BILLED_STAGE:
+            pending, completed = sort_faturado_orders(orders)
+            if pending:
+                cards_list.controls.append(self._section_label("Aguardando confirmação"))
+                self._append_cards(
+                    cards_list,
+                    pending,
+                    stages,
+                    on_move_callback,
+                    on_delete_callback,
+                    on_details_callback,
+                    on_complete_callback=on_complete_callback,
+                    is_master=is_master,
                 )
-            )
+            if completed:
+                if pending:
+                    cards_list.controls.append(ft.Divider(color=colors.BORDER_COLOR, height=1))
+                    cards_list.controls.append(self._section_label("Concluídos"))
+                self._append_cards(
+                    cards_list,
+                    completed,
+                    stages,
+                    on_move_callback,
+                    on_delete_callback,
+                    on_details_callback,
+                    on_complete_callback=on_complete_callback,
+                    is_master=is_master,
+                )
+            if not pending and not completed:
+                self._append_empty_state(cards_list)
+        else:
+            if orders:
+                self._append_cards(
+                    cards_list,
+                    orders,
+                    stages,
+                    on_move_callback,
+                    on_delete_callback,
+                    on_details_callback,
+                    is_master=is_master,
+                )
+            else:
+                self._append_empty_state(cards_list)
 
         super().__init__(
             expand=expand,
@@ -106,3 +126,58 @@ class KanbanColumn(ft.Container):
                 expand=True,
             ),
         )
+
+    @staticmethod
+    def _section_label(text: str) -> ft.Container:
+        return ft.Container(
+            content=ft.Text(
+                text,
+                size=FONT_CAPTION,
+                color=colors.TEXT_MUTED,
+                weight=ft.FontWeight.W_600,
+            ),
+            padding=make_padding_symmetric(horizontal=S2, vertical=S1),
+        )
+
+    @staticmethod
+    def _append_empty_state(cards_list: ft.Column) -> None:
+        cards_list.controls.append(
+            ft.Container(
+                content=ft.Text(
+                    "Nenhum pedido nesta etapa",
+                    size=11,
+                    color=colors.TEXT_MUTED,
+                    text_align=ft.TextAlign.CENTER,
+                ),
+                padding=S4,
+                alignment=get_alignment_center(),
+            )
+        )
+
+    @staticmethod
+    def _append_cards(
+        cards_list: ft.Column,
+        orders: list,
+        stages: list,
+        on_move_callback,
+        on_delete_callback,
+        on_details_callback,
+        *,
+        on_complete_callback=None,
+        is_master: bool = False,
+    ) -> None:
+        for order in orders:
+            cards_list.controls.append(
+                ft.Container(
+                    content=OrderCard(
+                        order=order,
+                        stages=stages,
+                        on_move_callback=on_move_callback,
+                        on_delete_callback=on_delete_callback,
+                        on_details_callback=on_details_callback,
+                        on_complete_callback=on_complete_callback,
+                        is_master=is_master,
+                    ),
+                    padding=make_padding_symmetric(horizontal=S2),
+                )
+            )

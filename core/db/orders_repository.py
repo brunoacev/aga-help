@@ -84,10 +84,26 @@ def update_order_status(order_id: int, new_status: str) -> None:
             )
         else:
             conn.execute(
-                "UPDATE orders SET status = ? WHERE id = ?",
+                """
+                UPDATE orders
+                SET status = ?, is_billed = 0, billed_at = ''
+                WHERE id = ?
+                """,
                 (clean_status, order_id),
             )
         conn.commit()
+
+
+def mark_order_billed(order_id: int, *, is_billed: bool = True) -> None:
+    """Marca pedido como faturamento concluído na coluna Faturado."""
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE orders SET is_billed = ? WHERE id = ?",
+            (1 if is_billed else 0, order_id),
+        )
+        conn.commit()
+    state = "concluído" if is_billed else "pendente"
+    add_log("FATURAMENTO", f"Pedido #{order_id} marcado como faturamento {state}.")
 
 
 def delete_order(order_id: int) -> None:
