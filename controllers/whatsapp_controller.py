@@ -11,6 +11,7 @@ from controllers.whatsapp_bridge_client import (
     WhatsAppBridgeClient,
     WhatsAppBridgeProcess,
 )
+from utils.formatting import format_br_phone
 from utils.qr_code import qr_data_uri
 
 STATUS_DISCONNECTED = "DISCONNECTED"
@@ -63,7 +64,7 @@ class WhatsAppController:
     @property
     def connected_phone(self) -> str:
         payload = self._safe_status()
-        return str(payload.get("phone") or "")
+        return format_br_phone(str(payload.get("phone") or ""))
 
     def ensure_bridge_started(self) -> tuple[bool, str]:
         if not self.node_available:
@@ -102,11 +103,12 @@ class WhatsAppController:
             return []
         conversations: list[WhatsAppConversation] = []
         for row in rows:
+            raw_phone = str(row.get("phone") or row.get("id") or "")
             conversations.append(
                 WhatsAppConversation(
                     id=str(row.get("id") or ""),
                     name=str(row.get("name") or "Contato"),
-                    phone=str(row.get("phone") or ""),
+                    phone=format_br_phone(raw_phone),
                     last_message=str(row.get("last_message") or ""),
                     unread=int(row.get("unread") or 0),
                 )
@@ -155,6 +157,20 @@ class WhatsAppController:
             return False, str(payload.get("error") or "Falha ao enviar.")
         except requests.RequestException as exc:
             return False, f"Erro de comunicação com a ponte: {exc}"
+
+    @staticmethod
+    def build_outgoing_message(text: str) -> WhatsAppMessage:
+        """Monta mensagem otimista para exibição imediata na UI."""
+        from datetime import datetime
+
+        now = datetime.now()
+        return WhatsAppMessage(
+            from_me=True,
+            text=text.strip(),
+            time=now.strftime("%H:%M"),
+            timestamp=int(now.timestamp() * 1000),
+            msg_type="text",
+        )
 
     def disconnect(self) -> tuple[bool, str]:
         try:

@@ -15,6 +15,7 @@ from controllers.whatsapp_controller import (
     WhatsAppMessage,
 )
 from core import colors
+from utils.formatting import format_br_phone
 from utils.flet_compat import border_all, get_alignment_center, make_padding_symmetric, show_snackbar
 from utils.ui_theme import FONT_BODY, FONT_CAPTION, RADIUS, S1, S2, S3, S4, field_style, page_header, text_section_heading
 
@@ -35,7 +36,8 @@ class WhatsAppView(ft.Container):
         self._polling = False
         self._last_status = STATUS_DISCONNECTED
         self._last_qr_src = ""
-        self._message_signatures: dict[str, str] = {}
+        self._sync_index: dict[str, int] = {}
+        self._pending_optimistic: dict[str, str] = {}
         self._chat_filter = ""
 
         self.node_alert = ft.Container(
@@ -295,7 +297,7 @@ class WhatsAppView(ft.Container):
                 self._set_compose_enabled(False)
             elif status == STATUS_CONNECTED:
                 phone = self.controller.connected_phone or "WhatsApp"
-                self.lbl_connected_badge.content.controls[1].value = f"Conectado como {phone}"
+                self.lbl_connected_badge.content.controls[1].value = f"Conectado como {format_br_phone(phone) or phone}"
                 self.qr_panel.visible = False
                 self.connected_panel.visible = True
                 self.qr_image.visible = False
@@ -303,7 +305,7 @@ class WhatsAppView(ft.Container):
                 self._set_compose_enabled(bool(self.selected_conversation_id))
                 self._render_conversation_list()
                 if self.selected_conversation_id:
-                    self._refresh_messages(self.selected_conversation_id, scroll_to_bottom=True, update=False)
+                    self._sync_new_messages(self.selected_conversation_id, scroll_to_bottom=True, update=False)
             else:
                 self._set_status_label("Desconectado", colors.ERROR)
                 self.qr_panel.visible = True
@@ -347,6 +349,7 @@ class WhatsAppView(ft.Container):
             for item in conversations
             if self._chat_filter in item.name.lower()
             or self._chat_filter in item.phone.lower()
+            or self._chat_filter in format_br_phone(item.phone).lower()
             or self._chat_filter in item.last_message.lower()
         ]
 
@@ -409,6 +412,12 @@ class WhatsAppView(ft.Container):
                                 size=FONT_BODY,
                                 weight=ft.FontWeight.W_600,
                                 color=colors.WA_LIST_NAME,
+                                overflow=ft.TextOverflow.ELLIPSIS,
+                            ),
+                            ft.Text(
+                                format_br_phone(conversation.phone) or conversation.phone,
+                                size=10,
+                                color=colors.WA_META_INCOMING,
                                 overflow=ft.TextOverflow.ELLIPSIS,
                             ),
                             ft.Text(
@@ -478,11 +487,62 @@ class WhatsAppView(ft.Container):
             alignment=alignment,
         )
 
-    def _message_signature(self, messages: list[WhatsAppMessage]) -> str:
-        if not messages:
-            return "empty"
-        last = messages[-1]
-        return f"{len(messages)}:{last.timestamp}:{last.text}:{last.from_me}"
+    def _scroll_chat_to_bottom(self, *, duration: int = 300) -> None:
+        if not self.messages_list.controls:
+            return
+        try:
+            self.messages_list.scroll_to(offset=-1, duration=duration)
+        except (TypeError, ValueError, AttributeError):
+            self.messages_list.scroll_to(scroll_key=-1, duration=duration)
+
+    def _append_message_bubble(self, message: WhatsAppMessage, *, scroll: bool = True) -> None:
+        self.messages_list.controls.append(self._build_message_bubble(message))
+        self.chat_empty_hint.visible = False
+        if scroll:
+            self._scroll_chat_to_bottom()
+
+    def _reset_chat_messages(self, conversation_id: str) -> None:
+        self._sync_index[conversation_id] = 0
+        self._pending_optimistic.pop(conversation_id, None)
+        self.messages_list.controls.clear()
+        messages = self.controller.get_messages(conversation_id)
+        for message in messages:
+            self._append_message_bubble(message, scroll=False)
+        self._sync_index[conversation_id] = len(messages)
+        self.chat_empty_hint.visible = not messages
+        self._scroll_chat_to_bottom()
+
+    def _sync_new_messages(
+        self,
+        conversation_id: str,
+        *,
+        scroll_to_bottom: bool = False,
+        update: bool = True,
+    ) -> bool:
+        messages = self.controller.get_messages(conversation_id)
+        synced = self._sync_index.get(conversation_id, 0)
+        pending_text = self._pending_optimistic.get(conversation_id)
+
+        if pending_text and messages and messages[-1].from_me and messages[-1].text == pending_text:
+            if self.messages_list.controls and synced < len(messages):
+                self.messages_list.controls.pop()
+            self._pending_optimistic.pop(conversation_id, None)
+            synced = min(synced, len(messages) - 1)
+
+        appended = False
+        for message in messages[synced:]:
+            self._append_message_bubble(message, scroll=False)
+            appended = True
+
+        self._sync_index[conversation_id] = len(messages)
+        self.chat_empty_hint.visible = not self.messages_list.controls
+
+        if appended and scroll_to_bottom:
+            self._scroll_chat_to_bottom()
+
+        if update and appended:
+            self._render_page()
+        return appended
 
     def _select_conversation(self, conversation_id: str, *, update: bool = True) -> None:
         self.selected_conversation_id = conversation_id
@@ -493,32 +553,13 @@ class WhatsAppView(ft.Container):
         if not conversation:
             return
 
-        self.chat_header.value = f"{conversation.name}  ·  {conversation.phone}"
+        self.chat_header.value = (
+            f"{conversation.name}  ·  {format_br_phone(conversation.phone) or conversation.phone}"
+        )
         self.controller.mark_conversation_read(conversation_id)
-        self._refresh_messages(conversation_id, scroll_to_bottom=True, update=False)
-        self.chat_empty_hint.visible = not self.messages_list.controls
+        self._reset_chat_messages(conversation_id)
         self._set_compose_enabled(self._last_status == STATUS_CONNECTED)
         self._render_conversation_list()
-        if update:
-            self._render_page()
-
-    def _refresh_messages(
-        self,
-        conversation_id: str,
-        *,
-        scroll_to_bottom: bool = False,
-        update: bool = True,
-    ) -> None:
-        messages = self.controller.get_messages(conversation_id)
-        signature = self._message_signature(messages)
-        if signature == self._message_signatures.get(conversation_id) and not scroll_to_bottom:
-            return
-        self._message_signatures[conversation_id] = signature
-        self.messages_list.controls.clear()
-        for message in messages:
-            self.messages_list.controls.append(self._build_message_bubble(message))
-
-        self.chat_empty_hint.visible = not messages
         if update:
             self._render_page()
 
@@ -527,13 +568,31 @@ class WhatsAppView(ft.Container):
             show_snackbar(self.app_page, "Selecione uma conversa.", success=False)
             return
         text = (self.txt_message.value or "").strip()
-        ok, error = self.controller.send_message(self.selected_conversation_id, text)
-        if not ok:
-            show_snackbar(self.app_page, error or "Não foi possível enviar.", success=False)
+        if not text:
+            show_snackbar(self.app_page, "Digite uma mensagem.", success=False)
             return
+
+        chat_id = self.selected_conversation_id
+        optimistic = self.controller.build_outgoing_message(text)
         self.txt_message.value = ""
-        self._message_signatures.pop(self.selected_conversation_id, None)
-        self._refresh_messages(self.selected_conversation_id, scroll_to_bottom=True, update=False)
+        self._pending_optimistic[chat_id] = text
+        self._append_message_bubble(optimistic, scroll=True)
+        self._render_page()
+
+        if self.app_page:
+            self.app_page.run_task(self._send_message_async, chat_id, text)
+
+    async def _send_message_async(self, chat_id: str, text: str) -> None:
+        ok, error = await asyncio.to_thread(self.controller.send_message, chat_id, text)
+        if not ok:
+            if self._pending_optimistic.get(chat_id) == text and self.messages_list.controls:
+                self.messages_list.controls.pop()
+            self._pending_optimistic.pop(chat_id, None)
+            show_snackbar(self.app_page, error or "Não foi possível enviar.", success=False)
+            self._render_page()
+            return
+
+        self._sync_new_messages(chat_id, scroll_to_bottom=True, update=False)
         self._render_conversation_list()
         self._render_page()
 
@@ -552,7 +611,8 @@ class WhatsAppView(ft.Container):
             show_snackbar(self.app_page, error or "Falha ao desconectar.", success=False)
             return
         self._last_qr_src = ""
-        self._message_signatures.clear()
+        self._sync_index.clear()
+        self._pending_optimistic.clear()
         self.selected_conversation_id = None
         self.messages_list.controls.clear()
         self._set_compose_enabled(False)

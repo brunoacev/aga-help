@@ -22,17 +22,17 @@ def test_list_conversations_from_bridge():
     controller = WhatsAppController()
     controller.client = MagicMock()
     controller.client.list_chats.return_value = [
-        {
-            "id": "558599999999@s.whatsapp.net",
-            "name": "Cliente Teste",
-            "phone": "+558599999999",
-            "last_message": "Olá",
-            "unread": 1,
-        }
+            {
+                "id": "5585999999999@s.whatsapp.net",
+                "name": "Cliente Teste",
+                "phone": "+5585999999999",
+                "last_message": "Olá",
+                "unread": 1,
+            }
     ]
     conversations = controller.list_conversations()
     assert len(conversations) == 1
-    assert conversations[0].phone.startswith("+55")
+    assert conversations[0].phone == "+55 (85) 99999-9999"
 
 
 def test_get_messages_from_bridge():

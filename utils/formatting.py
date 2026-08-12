@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 
 def safe_float(val) -> float:
     """Converte valor monetário/numerico com fallback seguro."""
@@ -46,3 +48,37 @@ def format_meters(value: float) -> str:
     """Formata metragem para exibição no padrão brasileiro."""
     text = f"{value:.2f}".rstrip("0").rstrip(".")
     return text.replace(".", ",")
+
+
+def format_br_phone(phone_number: str) -> str:
+    """Formata telefone brasileiro: +55 (85) 99999-9999 ou +55 (85) 3322-1234."""
+    raw = str(phone_number or "").strip()
+    if not raw:
+        return ""
+
+    if "@" in raw:
+        raw = raw.split("@", 1)[0]
+
+    digits = re.sub(r"\D", "", raw)
+    if not digits:
+        return phone_number
+
+    if digits.startswith("0"):
+        digits = digits.lstrip("0") or digits
+
+    if not digits.startswith("55"):
+        digits = f"55{digits}"
+
+    local = digits[2:]
+    if len(local) < 10:
+        return f"+{digits}"
+
+    ddd = local[:2]
+    number = local[2:]
+
+    if len(number) >= 9:
+        mobile = number[-9:]
+        return f"+55 ({ddd}) {mobile[:5]}-{mobile[5:]}"
+
+    landline = number[-8:]
+    return f"+55 ({ddd}) {landline[:4]}-{landline[4:]}"
