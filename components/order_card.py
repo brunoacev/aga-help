@@ -7,6 +7,7 @@ import flet as ft
 from core import colors
 from utils.formatting import format_brl
 from utils.flet_compat import border_all, make_padding_symmetric, safe_update
+from utils.order_card_display import build_card_summary_lines
 from utils.ui_theme import FONT_BODY, FONT_CAPTION, FONT_LABEL, RADIUS, S2, S3, icon_button
 
 
@@ -19,9 +20,6 @@ class OrderCard(ft.Container):
         reseller_name = order.get("reseller_name", "Revenda Desconhecida")
         phone = order.get("phone", "")
         address = order.get("address", "Agatek Persianas e Cortinas de Fortaleza")
-        description = order.get("description", "Sem descrição")
-        width = order.get("width", "")
-        height = order.get("height", "")
         current_status = order.get("status", "Orçamento")
 
         value = float(order.get("value", 0.0))
@@ -63,13 +61,20 @@ class OrderCard(ft.Container):
             )
         )
 
-        dimensions_text = f" · {width or '?'}m × {height or '?'}m" if (width or height) else ""
-        desc_text = ft.Text(
-            f"{description}{dimensions_text}",
-            size=FONT_CAPTION,
-            color=colors.TEXT_SECONDARY,
-            max_lines=2,
-            overflow=ft.TextOverflow.ELLIPSIS,
+        summary_lines = build_card_summary_lines(order)
+        summary_column = ft.Column(
+            [
+                ft.Text(
+                    line,
+                    size=FONT_CAPTION,
+                    color=colors.TEXT_SECONDARY,
+                    max_lines=2,
+                    overflow=ft.TextOverflow.ELLIPSIS,
+                )
+                for line in summary_lines
+            ],
+            spacing=S2 // 4,
+            tight=True,
         )
 
         financial_box = ft.Container(
@@ -159,7 +164,7 @@ class OrderCard(ft.Container):
                 [
                     card_header,
                     ft.Column(contact_info, spacing=S2 // 4, tight=True),
-                    desc_text,
+                    summary_column,
                     financial_box,
                     ft.Divider(color=colors.BORDER_COLOR, height=1),
                     actions_row,

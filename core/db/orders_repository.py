@@ -23,6 +23,7 @@ def add_order(
     height: str = "",
     status: str = "Orçamento",
     items_json: str = "[]",
+    service_type: str = "componentes",
 ) -> None:
     """Insere um novo pedido."""
     target_address = sanitize_text(address) or AGATEK_ADDRESS
@@ -32,8 +33,8 @@ def add_order(
             INSERT INTO orders (
                 order_number, reseller_name, phone, address, value,
                 entry_date, deadline_date, description, width, height,
-                status, created_at, items_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                status, created_at, items_json, service_type
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 sanitize_text(order_number, max_length=30),
@@ -49,6 +50,7 @@ def add_order(
                 sanitize_text(status, max_length=30),
                 datetime.now().strftime("%Y-%m-%d %H:%M"),
                 sanitize_text(items_json),
+                sanitize_text(service_type, max_length=30),
             ),
         )
         conn.commit()

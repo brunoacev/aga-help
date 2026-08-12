@@ -50,9 +50,14 @@ def init_db() -> None:
             )
             """
         )
-        for col in ["phone", "address", "width", "height", "items_json"]:
+        for col in ["phone", "address", "width", "height", "items_json", "service_type"]:
             try:
-                default = "''" if col != "items_json" else "'[]'"
+                if col == "items_json":
+                    default = "'[]'"
+                elif col == "service_type":
+                    default = "'componentes'"
+                else:
+                    default = "''"
                 conn.execute(f"ALTER TABLE orders ADD COLUMN {col} TEXT DEFAULT {default}")
             except sqlite3.OperationalError:
                 pass

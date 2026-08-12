@@ -66,6 +66,7 @@ def create_order(form_data: dict) -> tuple[bool, str]:
         height=sanitize_text(form_data.get("height", ""), max_length=20),
         status="Orçamento",
         items_json=serialize_order_items(form_data.get("items") or []),
+        service_type=sanitize_text(form_data.get("service_type", SERVICE_PARTS), max_length=30),
     )
     return True, ""
 
