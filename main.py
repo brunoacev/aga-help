@@ -107,11 +107,11 @@ def main(page: ft.Page) -> None:
         ft.Row(
             [
                 sidebar,
-                ft.VerticalDivider(width=1, color=colors.BORDER_COLOR),
                 content_area,
             ],
             expand=True,
-            spacing=0,
+            spacing=S2,
+            vertical_alignment=ft.CrossAxisAlignment.STRETCH,
         )
     )
 
