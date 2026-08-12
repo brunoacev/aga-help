@@ -3,10 +3,23 @@
 from datetime import datetime
 
 from utils.order_dates import (
+    current_order_timestamp,
     format_order_date_label,
+    normalize_order_created_at,
     resolve_order_billing_date,
     resolve_order_created_date,
 )
+
+
+def test_current_order_timestamp_format():
+    ts = current_order_timestamp()
+    assert len(ts) == 19
+    assert ts[4] == "-" and ts[7] == "-"
+
+
+def test_normalize_order_created_at_fills_missing():
+    order = normalize_order_created_at({"id": 1})
+    assert order["created_at"]
 
 
 def test_format_order_date_label_from_entry_date():

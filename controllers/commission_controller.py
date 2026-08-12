@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from core.db.orders_repository import get_orders
+from core.db.orders_repository import backfill_order_timestamps, get_orders
 from utils.formatting import format_brl
-from utils.order_dates import format_order_datetime, resolve_order_billing_date
+from utils.order_dates import format_order_datetime, normalize_order_created_at, resolve_order_billing_date
 from utils.period_filter import format_period_label, get_period_bounds, shift_reference_date
 
 BILLED_STATUS = "Faturado"
@@ -47,9 +47,11 @@ class CommissionController:
         return True
 
     def _filter_billed_orders(self) -> list[dict]:
+        backfill_order_timestamps()
         start, end = get_period_bounds(self.period, self.reference_date)
         filtered: list[dict] = []
         for order in get_orders():
+            order = normalize_order_created_at(order)
             if not self.is_commission_eligible(order):
                 continue
             billed_on = resolve_order_billing_date(order)

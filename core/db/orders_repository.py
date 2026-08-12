@@ -7,7 +7,7 @@ from datetime import datetime
 from core.constants import AGATEK_ADDRESS
 from core.db.connection import get_connection
 from core.db.logs_repository import add_log
-from utils.order_dates import ORDER_TIMESTAMP_FMT, parse_order_created_date
+from utils.order_dates import ORDER_TIMESTAMP_FMT, current_order_timestamp, parse_order_created_date
 from utils.sanitization import sanitize_name, sanitize_phone, sanitize_text
 
 
@@ -25,9 +25,11 @@ def add_order(
     status: str = "Orçamento",
     items_json: str = "[]",
     service_type: str = "componentes",
+    created_at: str | None = None,
 ) -> None:
     """Insere um novo pedido."""
     target_address = sanitize_text(address) or AGATEK_ADDRESS
+    timestamp = (created_at or "").strip() or current_order_timestamp()
     with get_connection() as conn:
         conn.execute(
             """
@@ -49,7 +51,7 @@ def add_order(
                 sanitize_text(width, max_length=20),
                 sanitize_text(height, max_length=20),
                 sanitize_text(status, max_length=30),
-                datetime.now().strftime(ORDER_TIMESTAMP_FMT),
+                timestamp,
                 sanitize_text(items_json),
                 sanitize_text(service_type, max_length=30),
             ),
@@ -60,6 +62,7 @@ def add_order(
 
 def get_orders() -> list[dict]:
     """Retorna todos os pedidos ordenados por id decrescente."""
+    backfill_order_timestamps()
     with get_connection() as conn:
         conn.row_factory = _row_factory
         rows = conn.execute("SELECT * FROM orders ORDER BY id DESC").fetchall()
@@ -155,7 +158,7 @@ def backfill_order_timestamps() -> None:
             if not created:
                 parsed = parse_order_created_date({"entry_date": entry, "created_at": created})
                 created_value = (
-                    parsed.strftime(ORDER_TIMESTAMP_FMT) if parsed else now_str
+                    parsed.strftime(ORDER_TIMESTAMP_FMT) if parsed else current_order_timestamp()
                 )
                 conn.execute(
                     "UPDATE orders SET created_at = ? WHERE id = ?",

@@ -9,6 +9,7 @@ from core.db.logs_repository import add_log
 from utils.dates import add_business_days
 from utils.formatting import parse_brl
 from utils.order_items import serialize_order_items
+from utils.order_dates import ORDER_TIMESTAMP_FMT
 from utils.sanitization import sanitize_name, sanitize_text
 
 SERVICE_PARTS = "componentes"
@@ -47,6 +48,7 @@ def create_order(form_data: dict) -> tuple[bool, str]:
         return False, "A descrição do pedido não pode estar vazia."
 
     now = datetime.now()
+    created_at = now.strftime(ORDER_TIMESTAMP_FMT)
     today_str = now.strftime("%d/%m/%Y")
     days_count = int(form_data["deadline_days"])
     deadline_dt = add_business_days(now, days_count)
@@ -67,6 +69,7 @@ def create_order(form_data: dict) -> tuple[bool, str]:
         status="Orçamento",
         items_json=serialize_order_items(form_data.get("items") or []),
         service_type=sanitize_text(form_data.get("service_type", SERVICE_PARTS), max_length=30),
+        created_at=created_at,
     )
     return True, ""
 

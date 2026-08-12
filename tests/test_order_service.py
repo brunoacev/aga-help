@@ -29,6 +29,8 @@ def test_create_order_success():
     assert len(orders) == 1
     assert orders[0]["reseller_name"] == "Revenda Teste"
     assert orders[0]["value"] == 150.0
+    assert orders[0]["created_at"]
+    assert len(orders[0]["created_at"]) >= 19
 
 
 def test_create_order_rejects_empty_required():

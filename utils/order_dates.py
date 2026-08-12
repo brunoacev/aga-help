@@ -23,6 +23,19 @@ def _parse_datetime(raw: str | None) -> datetime | None:
     return None
 
 
+def current_order_timestamp() -> str:
+    """Timestamp ISO local para persistência em novos pedidos."""
+    return datetime.now().strftime(ORDER_TIMESTAMP_FMT)
+
+
+def normalize_order_created_at(order: dict) -> dict:
+    """Preenche created_at ausente em memória (fallback para pedidos legados)."""
+    if (order.get("created_at") or "").strip():
+        return order
+    fallback = current_order_timestamp()
+    return {**order, "created_at": fallback}
+
+
 def parse_order_created_date(order: dict) -> datetime | None:
     """Data de criação/orçamento do pedido."""
     for field in ("created_at", "entry_date", "order_date"):

@@ -6,6 +6,7 @@ from core.constants import AGATEK_ADDRESS
 from core.services.catalog_service import filter_components, is_meter_item
 from core.services.contact_service import get_profile_by_exact_name, search_reseller_profiles
 from core.services.order_service import SERVICE_CURTAINS, SERVICE_PARTS, create_order, validate_order_form
+from core.db.orders_repository import backfill_order_timestamps
 from utils.formatting import format_meters, parse_meters
 
 
@@ -136,6 +137,7 @@ class OrderFormController:
 
     def save(self, form_data: dict) -> tuple[bool, str]:
         """Valida e persiste pedido."""
+        backfill_order_timestamps()
         valid, error, _ = self.validate(form_data)
         if not valid:
             return False, error
