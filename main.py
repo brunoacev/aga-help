@@ -14,6 +14,7 @@ from views.commissions_view import CommissionsView
 from views.kanban_view import KanbanView
 from views.logs_view import LogsView
 from views.materials_view import MaterialsView
+from views.whatsapp_view import WhatsAppView
 from utils.flet_compat import confirm_dialog
 from utils.ui_theme import S2, apply_app_theme
 
@@ -70,6 +71,7 @@ def main(page: ft.Page) -> None:
     agenda_view = AgendaView(page)
     materials_view = MaterialsView()
     logs_view = LogsView()
+    whatsapp_view = WhatsAppView(page)
 
     def navigate_to(view_name: str) -> None:
         sidebar.set_active(view_name)
@@ -88,6 +90,8 @@ def main(page: ft.Page) -> None:
             logs_view.refresh()
         elif view_name == "commissions":
             content_area.content = commissions_view
+        elif view_name == "whatsapp":
+            content_area.content = whatsapp_view
         page.update()
         if view_name == "commissions":
             commissions_view.refresh()

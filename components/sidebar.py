@@ -11,13 +11,14 @@ from utils.ui_theme import RADIUS, RADIUS_LG, S1, S2, S3, S4, SIDEBAR_COLLAPSED,
 APP_VERSION = "AGA HELP v1.0"
 
 NAV_SECTIONS: tuple[tuple[str, tuple[tuple[str, str, str, str], ...]], ...] = (
-    (
-        "OPERACIONAL",
         (
-            ("add", "Novo Pedido", "ADD_SHOPPING_CART_ROUNDED", "add_shopping_cart"),
-            ("kanban", "Fluxo de Produção", "VIEW_WEEK_ROUNDED", "view_week"),
+            "OPERACIONAL",
+            (
+                ("add", "Novo Pedido", "ADD_SHOPPING_CART_ROUNDED", "add_shopping_cart"),
+                ("kanban", "Fluxo de Produção", "VIEW_WEEK_ROUNDED", "view_week"),
+                ("whatsapp", "WhatsApp / Conversas", "CHAT_BUBBLE_OUTLINE", "chat_bubble_outline"),
+            ),
         ),
-    ),
     (
         "GESTÃO & RESULTADOS",
         (
