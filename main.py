@@ -37,7 +37,7 @@ def main(page: ft.Page) -> None:
 
     content_area = ft.Container(expand=True, bgcolor=colors.BG_PRIMARY)
 
-    commissions_view = CommissionsView()
+    commissions_view = CommissionsView(page)
 
     def sync_sales_data() -> None:
         commissions_view.refresh()

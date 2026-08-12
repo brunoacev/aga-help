@@ -6,11 +6,10 @@ import flet as ft
 
 from controllers.commission_controller import CommissionController
 from core import colors
-from utils.flet_compat import border_all, dropdown_on_select, make_padding_symmetric, safe_update
+from utils.flet_compat import border_all, dropdown_on_select, make_padding_symmetric
 from utils.formatting import format_brl, safe_float
 from utils.period_filter import PERIOD_LABELS
 from utils.ui_theme import (
-    COL_QUARTER,
     FONT_BODY,
     FONT_CAPTION,
     RADIUS,
@@ -20,7 +19,6 @@ from utils.ui_theme import (
     dropdown_style,
     field_style,
     icon_button,
-    page_container,
     page_header,
     text_caption,
     text_section_heading,
@@ -32,9 +30,11 @@ EMPTY_STATE_MESSAGE = "Nenhum orçamento/faturamento encontrado para o período"
 class CommissionsView(ft.Container):
     """Painel de KPIs e comissões por período."""
 
-    def __init__(self):
+    def __init__(self, page: ft.Page):
+        self.app_page = page
         self.controller = CommissionController()
         self.border_all = border_all(colors.BORDER_COLOR)
+        self._is_refreshing = False
 
         self.dd_period = ft.Dropdown(
             label="Período",
@@ -45,7 +45,7 @@ class CommissionsView(ft.Container):
             **dropdown_on_select(self._on_filter_change),
         )
         self.lbl_period_range = ft.Text(
-            "Carregando período...",
+            "Selecione um período",
             size=FONT_BODY,
             color=colors.TEXT_SECONDARY,
             weight=ft.FontWeight.W_500,
@@ -64,20 +64,7 @@ class CommissionsView(ft.Container):
         self.kpi_avg_ticket = self._build_kpi_card("Ticket Médio", "R$ 0,00", colors.TEXT_PRIMARY)
         self.kpi_commission = self._build_kpi_card("Comissão Gerada", "R$ 0,00", colors.COLOR_ORCAMENTO)
 
-        self.table_column = ft.Column(
-            spacing=S2,
-            scroll=ft.ScrollMode.AUTO,
-            expand=True,
-            controls=[
-                ft.Row(
-                    [
-                        ft.ProgressRing(width=22, height=22, stroke_width=2),
-                        text_caption("Carregando comissões..."),
-                    ],
-                    spacing=S2,
-                ),
-            ],
-        )
+        self.table_column = ft.Column(spacing=S2, scroll=ft.ScrollMode.AUTO, expand=True)
 
         filters = ft.Container(
             bgcolor=colors.BG_SURFACE,
@@ -111,18 +98,18 @@ class CommissionsView(ft.Container):
             ),
         )
 
-        kpi_row = ft.ResponsiveRow(
+        kpi_row = ft.Row(
             [
-                ft.Container(self.kpi_total_billed, col=COL_QUARTER),
-                ft.Container(self.kpi_orders, col=COL_QUARTER),
-                ft.Container(self.kpi_avg_ticket, col=COL_QUARTER),
-                ft.Container(self.kpi_commission, col=COL_QUARTER),
+                ft.Container(content=self.kpi_total_billed, expand=1),
+                ft.Container(content=self.kpi_orders, expand=1),
+                ft.Container(content=self.kpi_avg_ticket, expand=1),
+                ft.Container(content=self.kpi_commission, expand=1),
             ],
             spacing=S3,
-            run_spacing=S3,
+            wrap=True,
         )
 
-        table_card = ft.Container(
+        table_section = ft.Container(
             bgcolor=colors.BG_SURFACE,
             border=self.border_all,
             border_radius=RADIUS,
@@ -131,7 +118,7 @@ class CommissionsView(ft.Container):
             content=ft.Column(
                 [
                     text_section_heading("Detalhamento de Comissões"),
-                    self.table_column,
+                    ft.Container(content=self.table_column, expand=True),
                 ],
                 spacing=S3,
                 expand=True,
@@ -140,20 +127,20 @@ class CommissionsView(ft.Container):
 
         super().__init__(
             expand=True,
-            content=page_container(
-                ft.Column(
-                    [
-                        page_header(
-                            "Comissões e Faturamento",
-                            "Métricas de pedidos faturados e comissões calculadas por período.",
-                        ),
-                        filters,
-                        kpi_row,
-                        table_card,
-                    ],
-                    spacing=S4,
-                    expand=True,
-                ),
+            bgcolor=colors.BG_PRIMARY,
+            padding=make_padding_symmetric(horizontal=S4, vertical=S4),
+            content=ft.Column(
+                [
+                    page_header(
+                        "Comissões e Faturamento",
+                        "Métricas de pedidos faturados e comissões calculadas por período.",
+                    ),
+                    filters,
+                    kpi_row,
+                    table_section,
+                ],
+                spacing=S4,
+                expand=True,
             ),
         )
 
@@ -289,6 +276,9 @@ class CommissionsView(ft.Container):
                 self.table_column.controls.append(self._build_table_row(row))
 
     def refresh(self) -> None:
+        if self._is_refreshing:
+            return
+        self._is_refreshing = True
         try:
             self.controller.set_period(self.dd_period.value or "Mensal")
             self.controller.set_commission_rate(self.txt_commission_rate.value or "")
@@ -298,10 +288,15 @@ class CommissionsView(ft.Container):
             self._reset_kpis()
             self.lbl_period_range.value = ""
             self._render_empty_table()
+        finally:
+            self._is_refreshing = False
 
-        safe_update(self)
+        if self.app_page:
+            self.app_page.update()
 
     def _on_filter_change(self, _e) -> None:
+        if self._is_refreshing:
+            return
         self.refresh()
 
     def _shift_period(self, direction: int) -> None:
