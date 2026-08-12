@@ -7,8 +7,8 @@ import flet as ft
 from core import colors
 from core.services.order_service import delete_order, get_orders, update_order_status
 from components.kanban_column import KanbanColumn
-from utils.flet_compat import confirm_dialog, safe_update
-from utils.ui_theme import S3, S4, page_container, page_header
+from utils.flet_compat import confirm_dialog
+from utils.ui_theme import S4, page_container, page_header
 
 
 class KanbanView(ft.Container):
@@ -24,10 +24,10 @@ class KanbanView(ft.Container):
     def refresh(self) -> None:
         orders = get_orders()
         kanban_row = ft.Row(
-            spacing=S3,
-            scroll=ft.ScrollMode.AUTO,
+            spacing=S4,
             expand=True,
             wrap=False,
+            vertical_alignment=ft.CrossAxisAlignment.STRETCH,
         )
 
         for stage in self.stages:
@@ -40,6 +40,7 @@ class KanbanView(ft.Container):
                     stages=self.stages,
                     on_move_callback=self._move_order,
                     on_delete_callback=self._confirm_delete,
+                    expand=True,
                 )
             )
 
@@ -50,14 +51,16 @@ class KanbanView(ft.Container):
                         "Acompanhamento de Pedidos",
                         "Arraste mentalmente entre colunas usando as setas de cada card.",
                     ),
-                    ft.Container(content=kanban_row, expand=True),
+                    kanban_row,
                 ],
                 spacing=S4,
+                tight=True,
                 expand=True,
             ),
             scroll=False,
         )
-        safe_update(self, self.app_page)
+        if self.app_page:
+            self.app_page.update()
 
     def _move_order(self, order_id: int, new_stage: str) -> None:
         update_order_status(order_id, new_stage)

@@ -17,9 +17,10 @@ from utils.ui_theme import S4, field_style, make_primary_button, page_container,
 class QuickOrderBar(ft.Container):
     """Orquestra seções do formulário de pedido."""
 
-    def __init__(self, stages, on_save_callback):
+    def __init__(self, stages, on_save_callback, page: ft.Page | None = None):
         self.stages = stages
         self.on_save_callback = on_save_callback
+        self.app_page = page
         self.controller = OrderFormController()
 
         input_style = field_style()
@@ -35,7 +36,7 @@ class QuickOrderBar(ft.Container):
         self.reseller_section.on_reseller_change = self.controller.resolve_reseller_profile
 
         self.order_spec_section = OrderSpecSection(input_style, digits_only_filter)
-        self.components_picker = ComponentsPicker(input_style, self.controller)
+        self.components_picker = ComponentsPicker(input_style, self.controller, page=page)
         self.components_picker.on_selection_changed = self._sync_description
         self.service_spec_section = ServiceSpecSection(input_style, decimal_filter)
 

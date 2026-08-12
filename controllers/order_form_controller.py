@@ -6,6 +6,7 @@ from core.constants import AGATEK_ADDRESS
 from core.services.catalog_service import filter_components, is_meter_item
 from core.services.contact_service import get_profile_by_exact_name, search_reseller_profiles
 from core.services.order_service import SERVICE_CURTAINS, SERVICE_PARTS, create_order, validate_order_form
+from utils.formatting import format_meters, parse_meters
 
 
 class OrderFormController:
@@ -38,17 +39,23 @@ class OrderFormController:
         """Delega verificação de item por metro."""
         return is_meter_item(item)
 
-    def add_component(self, component: dict, dim_val: str, qty_val: str) -> dict:
-        """Adiciona componente à lista selecionada."""
+    def add_component(self, component: dict, dim_val: str, qty_val: str) -> tuple[bool, str, dict | None]:
+        """Adiciona componente à lista selecionada. Retorna (sucesso, erro, item)."""
         try:
             qty = int(qty_val) if int(qty_val) > 0 else 1
         except ValueError:
             qty = 1
 
         is_meter = is_meter_item(component)
-        dim_str = (dim_val or "").strip()
+        dim_str = ""
 
-        if is_meter and dim_str:
+        if is_meter:
+            meters = parse_meters(dim_val)
+            if meters is None:
+                return False, "Informe a metragem em metros (m) para adicionar este componente.", None
+            dim_str = format_meters(meters)
+
+        if is_meter:
             display = f"{qty}x {component['code']} - {component['name']} ({dim_str}m)"
         else:
             display = f"{qty}x {component['code']} - {component['name']}"
@@ -57,12 +64,12 @@ class OrderFormController:
             "code": component["code"],
             "name": component["name"],
             "qty": qty,
-            "dim": dim_str if is_meter else "",
+            "dim": dim_str,
             "is_meter": is_meter,
             "display": display,
         }
         self.selected_components.append(entry)
-        return entry
+        return True, "", entry
 
     def remove_component(self, index: int) -> None:
         """Remove componente pelo índice."""
@@ -102,6 +109,18 @@ class OrderFormController:
                 return (
                     False,
                     "Para Venda de Peças, adicione pelo menos 1 componente ao pedido.",
+                    error_fields,
+                )
+            missing_meter = [
+                item["code"]
+                for item in self.selected_components
+                if item.get("is_meter") and not item.get("dim")
+            ]
+            if missing_meter:
+                error_fields.add("components")
+                return (
+                    False,
+                    "Informe a metragem (m) dos componentes vendidos por metro.",
                     error_fields,
                 )
         elif service_type in SERVICE_CURTAINS:

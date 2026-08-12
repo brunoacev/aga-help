@@ -54,7 +54,7 @@ def main(page: ft.Page) -> None:
             page.snack_bar.open = True
         page.update()
 
-    quick_order_view = QuickOrderBar(stages=stages, on_save_callback=on_order_saved)
+    quick_order_view = QuickOrderBar(stages=stages, on_save_callback=on_order_saved, page=page)
     agenda_view = AgendaView(page)
     materials_view = MaterialsView()
     logs_view = LogsView()
@@ -68,6 +68,7 @@ def main(page: ft.Page) -> None:
             content_area.content = quick_order_view
         elif view_name == "agenda":
             content_area.content = agenda_view
+            agenda_view.refresh_contacts()
         elif view_name == "materials":
             content_area.content = materials_view
         elif view_name == "logs":

@@ -7,13 +7,23 @@ import flet as ft
 from core import colors
 from components.order_card import OrderCard
 from utils.flet_compat import border_all, get_alignment_center, make_padding_symmetric
-from utils.ui_theme import FONT_LABEL, KANBAN_COL_WIDTH, RADIUS, S1, S2, S3, S4, WEIGHT_LABEL
+from utils.ui_theme import FONT_LABEL, RADIUS, S1, S2, S3, S4, WEIGHT_LABEL
 
 
 class KanbanColumn(ft.Container):
     """Coluna de etapa do Kanban."""
 
-    def __init__(self, stage: str, orders: list, stage_color: str, stages: list, on_move_callback, on_delete_callback):
+    def __init__(
+        self,
+        stage: str,
+        orders: list,
+        stage_color: str,
+        stages: list,
+        on_move_callback,
+        on_delete_callback,
+        *,
+        expand: bool | int = False,
+    ):
         header = ft.Row(
             [
                 ft.Row(
@@ -43,7 +53,7 @@ class KanbanColumn(ft.Container):
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
         )
 
-        cards_list = ft.Column(spacing=S3, scroll=ft.ScrollMode.AUTO, expand=True)
+        cards_list = ft.Column(spacing=S3, scroll=ft.ScrollMode.AUTO, expand=True, tight=True)
         for order in orders:
             cards_list.controls.append(
                 OrderCard(
@@ -69,7 +79,7 @@ class KanbanColumn(ft.Container):
             )
 
         super().__init__(
-            width=KANBAN_COL_WIDTH,
+            expand=expand,
             bgcolor=colors.BG_SURFACE,
             border=border_all(colors.BORDER_COLOR),
             border_radius=RADIUS,
@@ -81,6 +91,7 @@ class KanbanColumn(ft.Container):
                     cards_list,
                 ],
                 spacing=S3,
+                tight=True,
                 expand=True,
             ),
         )

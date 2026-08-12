@@ -5,7 +5,7 @@ from __future__ import annotations
 import flet as ft
 
 from core import colors
-from utils.flet_compat import border_all, get_alignment_center, make_padding_symmetric, safe_update
+from utils.flet_compat import border_all, get_alignment_center, make_padding_symmetric, safe_update, show_snackbar
 from utils.ui_theme import COL_5, COL_7, FONT_CAPTION, INPUT_HEIGHT, RADIUS, S1, S2, S3, S4, icon_button, section_card, text_caption, text_section_heading
 
 # Altura fixa da área de catálogo + itens (grid 8px) — evita crescimento vertical da janela
@@ -18,9 +18,11 @@ CATALOG_TABLE_HEIGHT = COMPONENTS_PANEL_HEIGHT - _SUBHEADING_BLOCK - INPUT_HEIGH
 class ComponentsPicker(ft.Container):
     """Catálogo filtrável e lista de itens selecionados."""
 
-    def __init__(self, input_style: dict, controller):
+    def __init__(self, input_style: dict, controller, page: ft.Page | None = None):
         self.controller = controller
+        self.app_page = page
         self.on_selection_changed = None
+        self._active_dim_field: ft.TextField | None = None
 
         self.txt_component_search = ft.TextField(
             label="Buscar por Código ou Nome do Componente",
@@ -89,7 +91,12 @@ class ComponentsPicker(ft.Container):
         self.refresh_catalog()
         self.refresh_selected()
 
+    def bind_page(self, page: ft.Page) -> None:
+        """Associa a página para exibir SnackBar de validação."""
+        self.app_page = page
+
     def _filter_components(self, _e):
+        self._clear_meter_error()
         query = (self.txt_component_search.value or "").strip()
         items = self.controller.filter_catalog(query, limit=2)
         self._render_catalog(items)
@@ -104,6 +111,7 @@ class ComponentsPicker(ft.Container):
 
     def _render_catalog(self, items: list[dict]) -> None:
         self.components_column.controls.clear()
+        self._active_dim_field = None
         if not items:
             self.components_column.controls.append(
                 text_caption("Nenhum componente encontrado no sistema.")
@@ -122,12 +130,14 @@ class ComponentsPicker(ft.Container):
                 keyboard_type=ft.KeyboardType.NUMBER,
             )
             txt_dim = ft.TextField(
-                hint_text="Metros (m)" if is_meter else "N/A",
+                hint_text="Metros (m) *" if is_meter else "N/A",
                 width=104,
                 disabled=not is_meter,
                 bgcolor=colors.BG_SURFACE_LIGHT if is_meter else colors.BG_SURFACE,
                 **mini_field,
             )
+            if is_meter:
+                txt_dim.on_change = lambda _e, field=txt_dim: self._clear_dim_error(field)
             txt_qty = ft.TextField(
                 value="1",
                 width=48,
@@ -152,7 +162,7 @@ class ComponentsPicker(ft.Container):
                     mouse_cursor=ft.MouseCursor.CLICK,
                 ),
                 tooltip="Adicionar ao Pedido",
-                on_click=lambda e, comp=item, d=txt_dim, q=txt_qty: self._add_item(comp, d.value, q.value),
+                on_click=lambda e, comp=item, d=txt_dim, q=txt_qty: self._add_item(comp, d.value, q.value, d),
             )
             row_item = ft.Container(
                 content=ft.Row(
@@ -188,12 +198,38 @@ class ComponentsPicker(ft.Container):
             )
             self.components_column.controls.append(row_item)
 
-    def _add_item(self, component: dict, dim_val: str, qty_val: str) -> None:
-        self.controller.add_component(component, dim_val, qty_val)
+    def _add_item(self, component: dict, dim_val: str, qty_val: str, txt_dim: ft.TextField | None = None) -> None:
+        ok, error, _entry = self.controller.add_component(component, dim_val, qty_val)
+        if not ok:
+            self._show_meter_error(error, txt_dim)
+            return
+
+        self._clear_meter_error()
+        if txt_dim is not None:
+            txt_dim.value = ""
         self.refresh_selected()
         if self.on_selection_changed:
             self.on_selection_changed(self.controller.components_summary())
         safe_update(self)
+
+    def _show_meter_error(self, message: str, txt_dim: ft.TextField | None) -> None:
+        if txt_dim is not None:
+            self._active_dim_field = txt_dim
+            txt_dim.border_color = colors.ERROR
+            safe_update(txt_dim)
+        if self.app_page is not None:
+            show_snackbar(self.app_page, message, success=False)
+
+    def _clear_dim_error(self, txt_dim: ft.TextField) -> None:
+        txt_dim.border_color = colors.BORDER_COLOR
+        if self._active_dim_field is txt_dim:
+            self._active_dim_field = None
+        safe_update(txt_dim)
+
+    def _clear_meter_error(self) -> None:
+        if self._active_dim_field is not None:
+            self._active_dim_field.border_color = colors.BORDER_COLOR
+            self._active_dim_field = None
 
     def _render_selected(self, items: list[dict]) -> None:
         self.selected_items_column.controls.clear()
@@ -242,6 +278,7 @@ class ComponentsPicker(ft.Container):
     def reset(self) -> None:
         self.txt_component_search.value = ""
         self.controller.reset()
+        self._clear_meter_error()
         self.refresh_catalog()
         self.refresh_selected()
         self.clear_validation()
@@ -251,3 +288,4 @@ class ComponentsPicker(ft.Container):
 
     def clear_validation(self) -> None:
         self.selected_items_container.border = border_all(colors.BORDER_COLOR)
+        self._clear_meter_error()

@@ -37,11 +37,40 @@ def test_validate_parts_requires_components():
 
 def test_validate_parts_allows_empty_description():
     controller = OrderFormController()
-    controller.add_component({"code": "5060", "name": "Comando"}, "", "1")
+    ok, error, _ = controller.add_component({"code": "5060", "name": "Comando"}, "", "1")
+    assert ok
+    assert error == ""
     valid, error, fields = controller.validate(_base_form(service_type="componentes", description=""))
     assert valid
     assert error == ""
     assert fields == set()
+
+
+def test_add_meter_component_requires_dimension():
+    controller = OrderFormController()
+    ok, error, entry = controller.add_component(
+        {"code": "4085", "name": "Tubo Alumínio 38mm"},
+        "",
+        "1",
+    )
+    assert not ok
+    assert "metragem" in error.lower()
+    assert entry is None
+    assert controller.selected_components == []
+
+
+def test_add_meter_component_accepts_valid_dimension():
+    controller = OrderFormController()
+    ok, error, entry = controller.add_component(
+        {"code": "4085", "name": "Tubo Alumínio 38mm"},
+        "2,30",
+        "1",
+    )
+    assert ok
+    assert error == ""
+    assert entry is not None
+    assert entry["dim"] == "2,3"
+    assert "(2,3m)" in entry["display"]
 
 
 def test_validate_curtain_requires_description():

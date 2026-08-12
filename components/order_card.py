@@ -147,13 +147,14 @@ class OrderCard(ft.Container):
             content=ft.Column(
                 [
                     card_header,
-                    ft.Column(contact_info, spacing=S2 // 4),
+                    ft.Column(contact_info, spacing=S2 // 4, tight=True),
                     desc_text,
                     financial_box,
                     ft.Divider(color=colors.BORDER_COLOR, height=1),
                     actions_row,
                 ],
                 spacing=S2,
+                tight=True,
             ),
         )
 
