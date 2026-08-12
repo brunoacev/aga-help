@@ -15,12 +15,24 @@ from utils.ui_theme import S4, page_container, page_header
 class KanbanView(ft.Container):
     """Gerencia renderização e ações do quadro Kanban."""
 
-    def __init__(self, page: ft.Page, stages: list[str], stage_colors: dict[str, str]):
+    def __init__(
+        self,
+        page: ft.Page,
+        stages: list[str],
+        stage_colors: dict[str, str],
+        *,
+        on_orders_changed=None,
+    ):
         self.app_page = page
         self.stages = stages
         self.stage_colors = stage_colors
+        self.on_orders_changed = on_orders_changed
         super().__init__(expand=True, bgcolor=colors.BG_PRIMARY)
         self.refresh()
+
+    def _notify_orders_changed(self) -> None:
+        if self.on_orders_changed:
+            self.on_orders_changed()
 
     def refresh(self) -> None:
         orders = get_orders()
@@ -67,6 +79,7 @@ class KanbanView(ft.Container):
     def _move_order(self, order_id: int, new_stage: str) -> None:
         update_order_status(order_id, new_stage)
         self.refresh()
+        self._notify_orders_changed()
 
     def _show_order_details(self, order: dict) -> None:
         show_order_items_dialog(self.app_page, order)
@@ -83,3 +96,4 @@ class KanbanView(ft.Container):
     def _delete_order(self, order_id: int) -> None:
         delete_order(order_id)
         self.refresh()
+        self._notify_orders_changed()

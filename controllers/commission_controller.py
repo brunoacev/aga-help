@@ -6,7 +6,7 @@ from datetime import datetime
 
 from core.db.orders_repository import get_orders
 from utils.formatting import format_brl
-from utils.order_dates import parse_order_billing_date
+from utils.order_dates import format_order_datetime, resolve_order_billing_date
 from utils.period_filter import format_period_label, get_period_bounds, shift_reference_date
 
 BILLED_STATUS = "Faturado"
@@ -35,18 +35,27 @@ class CommissionController:
     def shift_period(self, direction: int) -> None:
         self.reference_date = shift_reference_date(self.period, self.reference_date, direction)
 
+    @staticmethod
+    def is_commission_eligible(order: dict) -> bool:
+        """Pedido concluído/faturado com valor registrado."""
+        if order.get("status") != BILLED_STATUS:
+            return False
+        try:
+            float(order.get("value"))
+        except (TypeError, ValueError):
+            return False
+        return True
+
     def _filter_billed_orders(self) -> list[dict]:
         start, end = get_period_bounds(self.period, self.reference_date)
         filtered: list[dict] = []
         for order in get_orders():
-            if order.get("status") != BILLED_STATUS:
+            if not self.is_commission_eligible(order):
                 continue
-            billed_on = parse_order_billing_date(order)
-            if billed_on is None:
-                continue
+            billed_on = resolve_order_billing_date(order)
             if start <= billed_on <= end:
                 filtered.append(order)
-        filtered.sort(key=lambda o: parse_order_billing_date(o) or datetime.min, reverse=True)
+        filtered.sort(key=lambda o: resolve_order_billing_date(o), reverse=True)
         return filtered
 
     def _commission_amount(self, value: float) -> float:
@@ -66,10 +75,9 @@ class CommissionController:
         for order in orders:
             value = float(order.get("value") or 0)
             commission = self._commission_amount(value)
-            billed_on = parse_order_billing_date(order)
             rows.append(
                 {
-                    "date": billed_on.strftime("%d/%m/%Y") if billed_on else "—",
+                    "date": format_order_datetime(order, billing=True),
                     "order_number": order.get("order_number", "—"),
                     "client": order.get("reseller_name", "—"),
                     "total": value,
@@ -78,6 +86,7 @@ class CommissionController:
                     "commission": commission,
                     "commission_fmt": format_brl(commission),
                     "payment_status": order.get("payment_status") or "Pendente",
+                    "status": order.get("status", BILLED_STATUS),
                 }
             )
 

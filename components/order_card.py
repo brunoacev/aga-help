@@ -8,6 +8,7 @@ from core import colors
 from utils.formatting import format_brl
 from utils.flet_compat import border_all, make_padding_symmetric, safe_update
 from utils.order_card_display import build_card_summary_lines
+from utils.order_dates import format_order_date_label
 from utils.ui_theme import FONT_BODY, FONT_CAPTION, FONT_LABEL, RADIUS, S2, S3, icon_button
 
 
@@ -27,25 +28,39 @@ class OrderCard(ft.Container):
         formatted_value = format_brl(value)
         formatted_commission = format_brl(commission)
 
-        card_header = ft.Row(
+        order_date_label = format_order_date_label(order)
+
+        card_header = ft.Column(
             [
-                ft.Text(
-                    f"Pedido #{order_number}",
-                    weight=ft.FontWeight.W_600,
-                    size=FONT_LABEL,
-                    color=colors.TEXT_PRIMARY,
-                ),
-                ft.Text(
-                    reseller_name,
-                    size=FONT_BODY,
-                    color=colors.PRIMARY,
-                    weight=ft.FontWeight.W_500,
-                    overflow=ft.TextOverflow.ELLIPSIS,
-                    expand=True,
-                    text_align=ft.TextAlign.RIGHT,
+                ft.Row(
+                    [
+                        ft.Text(
+                            f"Pedido #{order_number}",
+                            weight=ft.FontWeight.W_600,
+                            size=FONT_LABEL,
+                            color=colors.TEXT_PRIMARY,
+                        ),
+                        ft.Text(
+                            order_date_label,
+                            size=FONT_CAPTION,
+                            color=colors.TEXT_MUTED,
+                        ),
+                        ft.Container(expand=True),
+                        ft.Text(
+                            reseller_name,
+                            size=FONT_BODY,
+                            color=colors.PRIMARY,
+                            weight=ft.FontWeight.W_500,
+                            overflow=ft.TextOverflow.ELLIPSIS,
+                            text_align=ft.TextAlign.RIGHT,
+                        ),
+                    ],
+                    alignment=ft.MainAxisAlignment.START,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
             ],
-            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            spacing=S2 // 4,
+            tight=True,
         )
 
         contact_info = []

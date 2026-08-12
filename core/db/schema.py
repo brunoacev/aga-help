@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 
 from core.db.connection import get_connection
+from core.db.orders_repository import backfill_order_timestamps
 
 
 def init_db() -> None:
@@ -63,4 +64,5 @@ def init_db() -> None:
                 conn.execute(f"ALTER TABLE orders ADD COLUMN {col} TEXT DEFAULT {default}")
             except sqlite3.OperationalError:
                 pass
+        backfill_order_timestamps()
         conn.commit()

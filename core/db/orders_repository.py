@@ -7,6 +7,7 @@ from datetime import datetime
 from core.constants import AGATEK_ADDRESS
 from core.db.connection import get_connection
 from core.db.logs_repository import add_log
+from utils.order_dates import ORDER_TIMESTAMP_FMT, parse_order_created_date
 from utils.sanitization import sanitize_name, sanitize_phone, sanitize_text
 
 
@@ -48,7 +49,7 @@ def add_order(
                 sanitize_text(width, max_length=20),
                 sanitize_text(height, max_length=20),
                 sanitize_text(status, max_length=30),
-                datetime.now().strftime("%Y-%m-%d %H:%M"),
+                datetime.now().strftime(ORDER_TIMESTAMP_FMT),
                 sanitize_text(items_json),
                 sanitize_text(service_type, max_length=30),
             ),
@@ -76,7 +77,7 @@ def update_order_status(order_id: int, new_status: str) -> None:
                 SET status = ?, billed_at = ?
                 WHERE id = ?
                 """,
-                (clean_status, datetime.now().strftime("%Y-%m-%d %H:%M"), order_id),
+                (clean_status, datetime.now().strftime(ORDER_TIMESTAMP_FMT), order_id),
             )
         else:
             conn.execute(
@@ -135,6 +136,40 @@ def get_order_profile_by_name(reseller_name: str) -> dict | None:
             (clean_q,),
         ).fetchone()
         return dict(row) if row else None
+
+
+def backfill_order_timestamps() -> None:
+    """Preenche timestamps ausentes em pedidos legados para relatórios e cards."""
+    now_str = datetime.now().strftime(ORDER_TIMESTAMP_FMT)
+    with get_connection() as conn:
+        conn.row_factory = _row_factory
+        rows = conn.execute(
+            "SELECT id, entry_date, created_at, billed_at, status FROM orders"
+        ).fetchall()
+        for row in rows:
+            order_id = row["id"]
+            created = (row.get("created_at") or "").strip()
+            billed = (row.get("billed_at") or "").strip()
+            entry = (row.get("entry_date") or "").strip()
+
+            if not created:
+                parsed = parse_order_created_date({"entry_date": entry, "created_at": created})
+                created_value = (
+                    parsed.strftime(ORDER_TIMESTAMP_FMT) if parsed else now_str
+                )
+                conn.execute(
+                    "UPDATE orders SET created_at = ? WHERE id = ?",
+                    (created_value, order_id),
+                )
+            else:
+                created_value = created
+
+            if row.get("status") == "Faturado" and not billed:
+                conn.execute(
+                    "UPDATE orders SET billed_at = ? WHERE id = ?",
+                    (created_value or now_str, order_id),
+                )
+        conn.commit()
 
 
 def _row_factory(cursor, row):

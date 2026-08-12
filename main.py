@@ -37,12 +37,23 @@ def main(page: ft.Page) -> None:
 
     content_area = ft.Container(expand=True, bgcolor=colors.BG_PRIMARY)
 
-    kanban_view = KanbanView(page, stages, stage_colors)
+    commissions_view = CommissionsView()
+
+    def sync_sales_data() -> None:
+        commissions_view.refresh()
+
+    kanban_view = KanbanView(
+        page,
+        stages,
+        stage_colors,
+        on_orders_changed=sync_sales_data,
+    )
 
     def on_order_saved():
         sidebar.set_active("kanban")
         content_area.content = kanban_view
         kanban_view.refresh()
+        sync_sales_data()
         snack = ft.SnackBar(
             content=ft.Text("Ordem gerada com sucesso!", color=colors.TEXT_PRIMARY),
             bgcolor=colors.BG_SURFACE_LIGHT,
@@ -59,7 +70,6 @@ def main(page: ft.Page) -> None:
     agenda_view = AgendaView(page)
     materials_view = MaterialsView()
     logs_view = LogsView()
-    commissions_view = CommissionsView()
 
     def navigate_to(view_name: str) -> None:
         sidebar.set_active(view_name)
@@ -94,6 +104,7 @@ def main(page: ft.Page) -> None:
         clear_all_orders()
         kanban_view.refresh()
         logs_view.refresh()
+        sync_sales_data()
         snack = ft.SnackBar(
             content=ft.Text("Banco de dados limpo com sucesso!", color=colors.TEXT_PRIMARY),
             bgcolor=colors.BG_SURFACE_LIGHT,

@@ -25,7 +25,7 @@ def test_build_report_calculates_commission():
             "value": 1000.0,
             "order_number": "100",
             "reseller_name": "Revenda A",
-            "billed_at": "2026-08-10 14:30",
+            "billed_at": "2026-08-10 14:30:00",
             "payment_status": "Pendente",
         }
     ]
@@ -35,3 +35,22 @@ def test_build_report_calculates_commission():
     assert report["metrics"]["total_billed"] == 1000.0
     assert report["metrics"]["total_commission"] == 100.0
     assert report["rows"][0]["commission"] == 100.0
+
+
+def test_legacy_order_without_date_uses_fallback():
+    controller = CommissionController()
+    controller.reference_date = datetime(2026, 8, 11)
+    controller.period = "Diário"
+    orders = [
+        {
+            "status": "Faturado",
+            "value": 500.0,
+            "order_number": "200",
+            "reseller_name": "Revenda B",
+            "payment_status": "Pendente",
+        }
+    ]
+    with patch("controllers.commission_controller.get_orders", return_value=orders):
+        report = controller.build_report()
+    assert report["metrics"]["order_count"] == 1
+    assert report["rows"][0]["total"] == 500.0
