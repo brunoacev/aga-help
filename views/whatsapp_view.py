@@ -345,8 +345,28 @@ class WhatsAppView(ft.Container):
         self.btn_send.disabled = not enabled
 
     def _render_page(self) -> None:
-        if self.app_page:
+        if not self.app_page or not self._polling:
+            return
+        try:
             self.app_page.update()
+        except RuntimeError:
+            self._polling = False
+
+    async def _scroll_chat_to_bottom(self, duration: int = 300) -> None:
+        if not self.messages_list.controls:
+            return
+        for kwargs in ({"offset": -1, "duration": duration}, {"scroll_key": -1, "duration": duration}):
+            try:
+                result = self.messages_list.scroll_to(**kwargs)
+                if asyncio.iscoroutine(result):
+                    await result
+                return
+            except (TypeError, ValueError, AttributeError, RuntimeError):
+                continue
+
+    def _schedule_scroll_to_bottom(self, *, duration: int = 300) -> None:
+        if self.app_page and self._polling:
+            self.app_page.run_task(self._scroll_chat_to_bottom, duration)
 
     def _on_search_conversations(self, e) -> None:
         self._chat_filter = (e.control.value or "").strip().lower()
@@ -600,19 +620,11 @@ class WhatsAppView(ft.Container):
         if not ok:
             show_snackbar(self.app_page, error or "Não foi possível reproduzir.", success=False)
 
-    def _scroll_chat_to_bottom(self, *, duration: int = 300) -> None:
-        if not self.messages_list.controls:
-            return
-        try:
-            self.messages_list.scroll_to(offset=-1, duration=duration)
-        except (TypeError, ValueError, AttributeError):
-            self.messages_list.scroll_to(scroll_key=-1, duration=duration)
-
     def _append_message_bubble(self, message: WhatsAppMessage, *, scroll: bool = True) -> None:
         self.messages_list.controls.append(self._build_message_bubble(message))
         self.chat_empty_hint.visible = False
         if scroll:
-            self._scroll_chat_to_bottom()
+            self._schedule_scroll_to_bottom()
 
     def _reset_chat_messages(self, conversation_id: str) -> None:
         self._sync_index[conversation_id] = 0
@@ -623,7 +635,7 @@ class WhatsAppView(ft.Container):
             self._append_message_bubble(message, scroll=False)
         self._sync_index[conversation_id] = len(messages)
         self.chat_empty_hint.visible = not messages
-        self._scroll_chat_to_bottom()
+        self._schedule_scroll_to_bottom()
 
     def _sync_new_messages(
         self,
@@ -651,7 +663,7 @@ class WhatsAppView(ft.Container):
         self.chat_empty_hint.visible = not self.messages_list.controls
 
         if appended and scroll_to_bottom:
-            self._scroll_chat_to_bottom()
+            self._schedule_scroll_to_bottom()
 
         if update and appended:
             self._render_page()
