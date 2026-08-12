@@ -31,9 +31,9 @@ class OrderFormController:
         suggestions = search_reseller_profiles(clean, limit=3)
         return {"phone": phone, "address": address, "suggestions": suggestions}
 
-    def filter_catalog(self, query: str, limit: int = 2) -> list[dict]:
+    def filter_catalog(self, query: str, limit: int = 2, category: str | None = None) -> list[dict]:
         """Filtra componentes do catálogo."""
-        return filter_components(query, limit=limit)
+        return filter_components(query, limit=limit, category=category)
 
     def is_meter_item(self, item: dict) -> bool:
         """Delega verificação de item por metro."""

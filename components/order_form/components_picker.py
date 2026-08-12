@@ -5,6 +5,7 @@ from __future__ import annotations
 import flet as ft
 
 from core import colors
+from core.components_data import FILTER_CATEGORY_ALL, FILTER_CATEGORY_OPTIONS
 from utils.flet_compat import border_all, get_alignment_center, make_padding_symmetric, safe_update, show_snackbar
 from utils.ui_theme import COL_5, COL_7, FONT_CAPTION, INPUT_HEIGHT, RADIUS, S1, S2, S3, S4, icon_button, section_card, text_caption, text_section_heading
 
@@ -31,6 +32,14 @@ class ComponentsPicker(ft.Container):
             expand=True,
             **input_style,
         )
+        self.dd_category = ft.Dropdown(
+            label="Categoria",
+            value=FILTER_CATEGORY_ALL,
+            options=[ft.dropdown.Option(cat) for cat in FILTER_CATEGORY_OPTIONS],
+            on_change=self._filter_components,
+            width=240,
+            **input_style,
+        )
         self.components_column = ft.Column(spacing=S2, scroll=ft.ScrollMode.AUTO, expand=True)
         self.components_table_container = ft.Container(
             content=self.components_column,
@@ -51,7 +60,7 @@ class ComponentsPicker(ft.Container):
         col_catalog = ft.Column(
             [
                 text_section_heading("Catálogo de Componentes"),
-                self.txt_component_search,
+                ft.Row([self.txt_component_search, self.dd_category], spacing=S3),
                 self.components_table_container,
             ],
             spacing=S3,
@@ -98,12 +107,14 @@ class ComponentsPicker(ft.Container):
     def _filter_components(self, _e):
         self._clear_meter_error()
         query = (self.txt_component_search.value or "").strip()
-        items = self.controller.filter_catalog(query, limit=2)
+        category = self.dd_category.value or FILTER_CATEGORY_ALL
+        items = self.controller.filter_catalog(query, limit=2, category=category)
         self._render_catalog(items)
         safe_update(self)
 
     def refresh_catalog(self) -> None:
-        items = self.controller.filter_catalog("", limit=2)
+        category = self.dd_category.value or FILTER_CATEGORY_ALL
+        items = self.controller.filter_catalog("", limit=2, category=category)
         self._render_catalog(items)
 
     def refresh_selected(self) -> None:
@@ -277,6 +288,7 @@ class ComponentsPicker(ft.Container):
 
     def reset(self) -> None:
         self.txt_component_search.value = ""
+        self.dd_category.value = FILTER_CATEGORY_ALL
         self.controller.reset()
         self._clear_meter_error()
         self.refresh_catalog()

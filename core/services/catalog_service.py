@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from core.components_data import COMPONENTS_CATALOG
+from core.components_data import COMPONENTS_CATALOG, FILTER_CATEGORY_ALL, OFFICIAL_CATEGORIES
 
 METER_KEYWORDS = (
     "metro", "m²", "tubo", "bandô", "bando", "perfil",
@@ -18,14 +18,23 @@ def is_meter_item(item: dict) -> bool:
     return any(kw in name_lower for kw in METER_KEYWORDS)
 
 
-def filter_components(query: str, *, limit: int | None = 2) -> list[dict]:
-    """Filtra catálogo por código, nome ou categoria."""
+def filter_components(
+    query: str,
+    *,
+    category: str | None = None,
+    limit: int | None = 2,
+) -> list[dict]:
+    """Filtra catálogo por código, nome, categoria e filtro de categoria."""
     clean = (query or "").strip().lower()
+    pool = COMPONENTS_CATALOG
+    if category and category != FILTER_CATEGORY_ALL:
+        pool = [c for c in pool if c["category"] == category]
+
     if not clean:
-        result = COMPONENTS_CATALOG[: limit or len(COMPONENTS_CATALOG)]
+        result = pool[: limit or len(pool)]
     else:
         result = [
-            c for c in COMPONENTS_CATALOG
+            c for c in pool
             if clean in c["code"].lower()
             or clean in c["name"].lower()
             or clean in c["category"].lower()
@@ -36,23 +45,10 @@ def filter_components(query: str, *, limit: int | None = 2) -> list[dict]:
 
 
 def categorize_materials(catalog_items: list[dict]) -> dict[str, list[dict]]:
-    """Agrupa materiais por categoria para a view de materiais."""
-    buckets = {
-        "horizontals": [],
-        "top": [],
-        "verticals": [],
-        "profiles": [],
-    }
+    """Agrupa materiais pelas categorias oficiais do catálogo."""
+    buckets = {category: [] for category in OFFICIAL_CATEGORIES}
     for item in catalog_items:
-        category = item.get("category", "").lower()
-        if any(k in category for k in ("horizonta", "horizontal", "lâmina", "lamina")):
-            buckets["horizontals"].append(item)
-        elif "vertical" in category or "tecidos" in category:
-            buckets["verticals"].append(item)
-        elif any(k in category for k in ("perfil", "tubo", "bandô", "bando", "trilho")):
-            buckets["profiles"].append(item)
-        elif any(k in category for k in ("top", "comando", "suporte", "rolo")):
-            buckets["top"].append(item)
-        else:
-            buckets["top"].append(item)
+        category = item.get("category", "")
+        if category in buckets:
+            buckets[category].append(item)
     return buckets
