@@ -293,28 +293,31 @@ class WhatsAppView(ft.Container):
         if self.app_page:
             self.app_page.update()
 
-    def _load_conversations(self) -> None:
+    def _render_conversation_list(self) -> None:
+        """Atualiza apenas os tiles da lista lateral (sem re-selecionar chat)."""
         conversations = self.controller.list_conversations()
-        previous = self.selected_conversation_id
         self.conversations_column.controls.clear()
-
         if not conversations:
             self.conversations_column.controls.append(
                 text_caption("Nenhuma conversa encontrada ainda.")
             )
+            return
+        for conversation in conversations:
+            self.conversations_column.controls.append(self._build_conversation_tile(conversation))
+
+    def _load_conversations(self) -> None:
+        conversations = self.controller.list_conversations()
+        self._render_conversation_list()
+
+        if not conversations:
             self.selected_conversation_id = None
             self.chat_empty_hint.visible = True
             self._set_compose_enabled(False)
             return
 
-        if previous not in {item.id for item in conversations}:
-            previous = conversations[0].id
-
-        for conversation in conversations:
-            self.conversations_column.controls.append(self._build_conversation_tile(conversation))
-
-        if previous:
-            self._select_conversation(previous, update=False)
+        valid_ids = {item.id for item in conversations}
+        if self.selected_conversation_id not in valid_ids:
+            self._select_conversation(conversations[0].id, update=False)
 
     def _build_conversation_tile(self, conversation: WhatsAppConversation) -> ft.Container:
         is_active = conversation.id == self.selected_conversation_id
@@ -399,7 +402,7 @@ class WhatsAppView(ft.Container):
         self._refresh_messages(conversation_id, update=False)
         self.chat_empty_hint.visible = not self.messages_column.controls
         self._set_compose_enabled(self._last_status == STATUS_CONNECTED)
-        self._load_conversations()
+        self._render_conversation_list()
         if update:
             self._render_page()
 
@@ -421,8 +424,8 @@ class WhatsAppView(ft.Container):
             show_snackbar(self.app_page, error or "Não foi possível enviar.", success=False)
             return
         self.txt_message.value = ""
-        self._refresh_messages(self.selected_conversation_id)
-        self._load_conversations()
+        self._refresh_messages(self.selected_conversation_id, update=False)
+        self._render_conversation_list()
         self._render_page()
 
     def _on_generate_qr(self, _e) -> None:
