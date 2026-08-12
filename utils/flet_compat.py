@@ -59,6 +59,29 @@ def safe_update(control: ft.Control, page: ft.Page | None = None) -> None:
             page.update()
 
 
+def show_snackbar(
+    page: ft.Page,
+    message: str,
+    *,
+    success: bool = True,
+    duration_ms: int = 3500,
+) -> None:
+    """Exibe feedback temporário via SnackBar."""
+    from core import colors
+
+    snack = ft.SnackBar(
+        content=ft.Text(message, color=colors.TEXT_PRIMARY),
+        bgcolor=colors.SUCCESS if success else colors.ERROR,
+        duration=duration_ms,
+    )
+    if hasattr(page, "show_dialog"):
+        page.show_dialog(snack)
+    else:
+        page.snack_bar = snack
+        page.snack_bar.open = True
+    page.update()
+
+
 def confirm_dialog(
     page: ft.Page,
     title: str,
