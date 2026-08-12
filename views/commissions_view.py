@@ -7,12 +7,12 @@ import flet as ft
 from controllers.commission_controller import CommissionController
 from core import colors
 from utils.flet_compat import border_all, dropdown_on_select, make_padding_symmetric, safe_update
+from utils.formatting import format_brl, safe_float
 from utils.period_filter import PERIOD_LABELS
 from utils.ui_theme import (
     COL_QUARTER,
     FONT_BODY,
     FONT_CAPTION,
-    FONT_LABEL,
     RADIUS,
     S2,
     S3,
@@ -25,6 +25,8 @@ from utils.ui_theme import (
     text_caption,
     text_section_heading,
 )
+
+EMPTY_STATE_MESSAGE = "Nenhum orçamento/faturamento encontrado para o período"
 
 
 class CommissionsView(ft.Container):
@@ -42,7 +44,12 @@ class CommissionsView(ft.Container):
             **dropdown_style(),
             **dropdown_on_select(self._on_filter_change),
         )
-        self.lbl_period_range = ft.Text("", size=FONT_BODY, color=colors.TEXT_SECONDARY, weight=ft.FontWeight.W_500)
+        self.lbl_period_range = ft.Text(
+            "Carregando período...",
+            size=FONT_BODY,
+            color=colors.TEXT_SECONDARY,
+            weight=ft.FontWeight.W_500,
+        )
         self.txt_commission_rate = ft.TextField(
             label="Comissão padrão (%)",
             value=str(int(self.controller.commission_rate)),
@@ -57,7 +64,20 @@ class CommissionsView(ft.Container):
         self.kpi_avg_ticket = self._build_kpi_card("Ticket Médio", "R$ 0,00", colors.TEXT_PRIMARY)
         self.kpi_commission = self._build_kpi_card("Comissão Gerada", "R$ 0,00", colors.COLOR_ORCAMENTO)
 
-        self.table_column = ft.Column(spacing=S2, scroll=ft.ScrollMode.AUTO, expand=True)
+        self.table_column = ft.Column(
+            spacing=S2,
+            scroll=ft.ScrollMode.AUTO,
+            expand=True,
+            controls=[
+                ft.Row(
+                    [
+                        ft.ProgressRing(width=22, height=22, stroke_width=2),
+                        text_caption("Carregando comissões..."),
+                    ],
+                    spacing=S2,
+                ),
+            ],
+        )
 
         filters = ft.Container(
             bgcolor=colors.BG_SURFACE,
@@ -136,6 +156,9 @@ class CommissionsView(ft.Container):
                 ),
             ),
         )
+
+    def did_mount(self) -> None:
+        """Carrega dados somente após a view estar na árvore Flet."""
         self.refresh()
 
     def _build_kpi_card(self, title: str, value: str, accent: str) -> ft.Container:
@@ -156,6 +179,13 @@ class CommissionsView(ft.Container):
 
     def _update_kpi(self, card: ft.Container, value: str) -> None:
         card.content.controls[1].value = value
+
+    def _reset_kpis(self) -> None:
+        zero = format_brl(0.0)
+        self._update_kpi(self.kpi_total_billed, zero)
+        self._update_kpi(self.kpi_orders, "0")
+        self._update_kpi(self.kpi_avg_ticket, zero)
+        self._update_kpi(self.kpi_commission, zero)
 
     def _build_table_header(self) -> ft.Container:
         headers = [
@@ -182,31 +212,48 @@ class CommissionsView(ft.Container):
         )
 
     def _build_table_row(self, row: dict) -> ft.Container:
+        rate = safe_float(row.get("rate"))
         return ft.Container(
             content=ft.Row(
                 [
-                    ft.Container(ft.Text(row["date"], size=FONT_CAPTION, color=colors.TEXT_SECONDARY), width=96),
                     ft.Container(
-                        ft.Text(row["order_number"], size=FONT_CAPTION, weight=ft.FontWeight.W_600, color=colors.PRIMARY),
+                        ft.Text(str(row.get("date") or "11/08/2026"), size=FONT_CAPTION, color=colors.TEXT_SECONDARY),
+                        width=96,
+                    ),
+                    ft.Container(
+                        ft.Text(
+                            str(row.get("order_number") or "—"),
+                            size=FONT_CAPTION,
+                            weight=ft.FontWeight.W_600,
+                            color=colors.PRIMARY,
+                        ),
                         width=80,
                     ),
                     ft.Container(
                         ft.Text(
-                            row["client"],
+                            str(row.get("client") or "—"),
                             size=FONT_CAPTION,
                             color=colors.TEXT_PRIMARY,
                             overflow=ft.TextOverflow.ELLIPSIS,
                         ),
                         expand=True,
                     ),
-                    ft.Container(ft.Text(row["total_fmt"], size=FONT_CAPTION, color=colors.TEXT_PRIMARY), width=112),
-                    ft.Container(ft.Text(f"{row['rate']:.0f}%", size=FONT_CAPTION, color=colors.TEXT_SECONDARY), width=72),
                     ft.Container(
-                        ft.Text(row["commission_fmt"], size=FONT_CAPTION, weight=ft.FontWeight.W_600, color=colors.SUCCESS),
+                        ft.Text(str(row.get("total_fmt") or format_brl(0.0)), size=FONT_CAPTION, color=colors.TEXT_PRIMARY),
+                        width=112,
+                    ),
+                    ft.Container(ft.Text(f"{rate:.0f}%", size=FONT_CAPTION, color=colors.TEXT_SECONDARY), width=72),
+                    ft.Container(
+                        ft.Text(
+                            str(row.get("commission_fmt") or format_brl(0.0)),
+                            size=FONT_CAPTION,
+                            weight=ft.FontWeight.W_600,
+                            color=colors.SUCCESS,
+                        ),
                         width=112,
                     ),
                     ft.Container(
-                        ft.Text(row["payment_status"], size=FONT_CAPTION, color=colors.TEXT_SECONDARY),
+                        ft.Text(str(row.get("payment_status") or "Pendente"), size=FONT_CAPTION, color=colors.TEXT_SECONDARY),
                         width=104,
                     ),
                 ],
@@ -219,27 +266,38 @@ class CommissionsView(ft.Container):
             border_radius=RADIUS,
         )
 
-    def refresh(self) -> None:
-        self.controller.set_period(self.dd_period.value or "Mensal")
-        self.controller.set_commission_rate(self.txt_commission_rate.value or "")
-        report = self.controller.build_report()
-
-        self.lbl_period_range.value = report["period_label"]
-        metrics = report["metrics"]
-        self._update_kpi(self.kpi_total_billed, metrics["total_billed_fmt"])
-        self._update_kpi(self.kpi_orders, str(metrics["order_count"]))
-        self._update_kpi(self.kpi_avg_ticket, metrics["avg_ticket_fmt"])
-        self._update_kpi(self.kpi_commission, metrics["total_commission_fmt"])
-
+    def _render_empty_table(self, message: str = EMPTY_STATE_MESSAGE) -> None:
         self.table_column.controls.clear()
         self.table_column.controls.append(self._build_table_header())
-        if not report["rows"]:
-            self.table_column.controls.append(
-                text_caption("Nenhum pedido faturado encontrado neste período.")
-            )
+        self.table_column.controls.append(text_caption(message))
+
+    def _apply_report(self, report: dict) -> None:
+        self.lbl_period_range.value = report.get("period_label") or ""
+        metrics = report.get("metrics") or {}
+        self._update_kpi(self.kpi_total_billed, metrics.get("total_billed_fmt") or format_brl(0.0))
+        self._update_kpi(self.kpi_orders, str(metrics.get("order_count") or 0))
+        self._update_kpi(self.kpi_avg_ticket, metrics.get("avg_ticket_fmt") or format_brl(0.0))
+        self._update_kpi(self.kpi_commission, metrics.get("total_commission_fmt") or format_brl(0.0))
+
+        rows = report.get("rows") or []
+        self.table_column.controls.clear()
+        self.table_column.controls.append(self._build_table_header())
+        if not rows:
+            self.table_column.controls.append(text_caption(EMPTY_STATE_MESSAGE))
         else:
-            for row in report["rows"]:
+            for row in rows:
                 self.table_column.controls.append(self._build_table_row(row))
+
+    def refresh(self) -> None:
+        try:
+            self.controller.set_period(self.dd_period.value or "Mensal")
+            self.controller.set_commission_rate(self.txt_commission_rate.value or "")
+            report = self.controller.build_report()
+            self._apply_report(report)
+        except Exception:
+            self._reset_kpis()
+            self.lbl_period_range.value = ""
+            self._render_empty_table()
 
         safe_update(self)
 

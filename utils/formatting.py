@@ -3,6 +3,14 @@
 from __future__ import annotations
 
 
+def safe_float(val) -> float:
+    """Converte valor monetário/numerico com fallback seguro."""
+    try:
+        return float(val) if val is not None else 0.0
+    except (ValueError, TypeError):
+        return 0.0
+
+
 def format_brl(value: float) -> str:
     """Formata valor monetário no padrão brasileiro."""
     formatted = f"R$ {value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")

@@ -88,8 +88,9 @@ def main(page: ft.Page) -> None:
             logs_view.refresh()
         elif view_name == "commissions":
             content_area.content = commissions_view
-            commissions_view.refresh()
         page.update()
+        if view_name == "commissions":
+            commissions_view.refresh()
 
     def on_clear_database():
         confirm_dialog(
