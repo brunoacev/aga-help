@@ -6,8 +6,8 @@ import flet as ft
 
 from core import colors
 from core.components_data import FILTER_CATEGORY_ALL, FILTER_CATEGORY_OPTIONS
-from utils.flet_compat import border_all, get_alignment_center, make_padding_symmetric, safe_update, show_snackbar
-from utils.ui_theme import COL_5, COL_7, FONT_CAPTION, INPUT_HEIGHT, RADIUS, S1, S2, S3, S4, icon_button, section_card, text_caption, text_section_heading
+from utils.flet_compat import border_all, dropdown_on_select, get_alignment_center, make_padding_symmetric, safe_update, show_snackbar
+from utils.ui_theme import COL_5, COL_7, FONT_CAPTION, INPUT_HEIGHT, RADIUS, S1, S2, S3, S4, dropdown_style, icon_button, section_card, text_caption, text_section_heading
 
 # Altura fixa da área de catálogo + itens (grid 8px) — evita crescimento vertical da janela
 COMPONENTS_PANEL_HEIGHT = 216
@@ -36,9 +36,9 @@ class ComponentsPicker(ft.Container):
             label="Categoria",
             value=FILTER_CATEGORY_ALL,
             options=[ft.dropdown.Option(cat) for cat in FILTER_CATEGORY_OPTIONS],
-            on_change=self._filter_components,
             width=240,
-            **input_style,
+            **dropdown_style(),
+            **dropdown_on_select(self._filter_components),
         )
         self.components_column = ft.Column(spacing=S2, scroll=ft.ScrollMode.AUTO, expand=True)
         self.components_table_container = ft.Container(

@@ -50,6 +50,18 @@ def make_button(text: str, on_click, *, icon=None, bgcolor=None, color=None, sty
     return ft.ElevatedButton(text=text, on_click=on_click, icon=icon, style=kwargs.get("style"))
 
 
+def dropdown_on_select(handler):
+    """Retorna kwargs de evento para Dropdown (Flet 0.86+ usa on_select)."""
+    import inspect
+
+    params = inspect.signature(ft.Dropdown.__init__).parameters
+    if "on_select" in params:
+        return {"on_select": handler}
+    if "on_change" in params:
+        return {"on_change": handler}
+    return {"on_select": handler}
+
+
 def safe_update(control: ft.Control, page: ft.Page | None = None) -> None:
     """Atualiza controle apenas se já estiver anexado à página."""
     try:

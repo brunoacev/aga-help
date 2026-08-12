@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from core.components_data import COMPONENTS_CATALOG, FILTER_CATEGORY_ALL, OFFICIAL_CATEGORIES
+from utils.text_search import matches_search_query, normalize_search_text
 
 METER_KEYWORDS = (
     "metro", "m²", "tubo", "bandô", "bando", "perfil",
@@ -25,19 +26,17 @@ def filter_components(
     limit: int | None = 2,
 ) -> list[dict]:
     """Filtra catálogo por código, nome, categoria e filtro de categoria."""
-    clean = (query or "").strip().lower()
+    clean = (query or "").strip()
     pool = COMPONENTS_CATALOG
     if category and category != FILTER_CATEGORY_ALL:
         pool = [c for c in pool if c["category"] == category]
 
-    if not clean:
+    if not normalize_search_text(clean):
         result = pool[: limit or len(pool)]
     else:
         result = [
             c for c in pool
-            if clean in c["code"].lower()
-            or clean in c["name"].lower()
-            or clean in c["category"].lower()
+            if matches_search_query(clean, c["code"], c["name"], c["category"])
         ]
         if limit:
             result = result[:limit]

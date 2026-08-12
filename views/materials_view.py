@@ -6,9 +6,9 @@ import flet as ft
 
 from core import colors
 from core.components_data import COMPONENTS_CATALOG, FILTER_CATEGORY_ALL, FILTER_CATEGORY_OPTIONS
-from core.services.catalog_service import categorize_materials
-from utils.flet_compat import border_all, make_padding_symmetric, safe_update
-from utils.ui_theme import FONT_CAPTION, RADIUS, S2, S3, S4, field_style, page_container, page_header, text_caption, text_section_heading
+from core.services.catalog_service import categorize_materials, filter_components
+from utils.flet_compat import border_all, dropdown_on_select, make_padding_symmetric, safe_update
+from utils.ui_theme import FONT_CAPTION, RADIUS, S2, S3, S4, dropdown_style, field_style, page_container, page_header, text_caption, text_section_heading
 
 COL_FIFTH = {"sm": 12, "md": 6, "lg": 4, "xl": 2}
 
@@ -28,9 +28,9 @@ class MaterialsView(ft.Container):
             label="Categoria",
             value=FILTER_CATEGORY_ALL,
             options=[ft.dropdown.Option(cat) for cat in FILTER_CATEGORY_OPTIONS],
-            on_change=self._filter_materials,
             width=280,
-            **field_style(),
+            **dropdown_style(),
+            **dropdown_on_select(self._filter_materials),
         )
 
         self.category_columns: dict[str, ft.Column] = {
@@ -143,17 +143,8 @@ class MaterialsView(ft.Container):
         )
 
     def _filter_materials(self, _e):
-        query = (self.txt_search.value or "").strip().lower()
+        query = (self.txt_search.value or "").strip()
         category = self.dd_category.value or FILTER_CATEGORY_ALL
-        filtered = COMPONENTS_CATALOG
-        if category != FILTER_CATEGORY_ALL:
-            filtered = [c for c in filtered if c["category"] == category]
-        if query:
-            filtered = [
-                c for c in filtered
-                if query in c["code"].lower()
-                or query in c["name"].lower()
-                or query in c["category"].lower()
-            ]
+        filtered = filter_components(query, category=category, limit=None)
         self._load_and_categorize(filtered)
         safe_update(self)
