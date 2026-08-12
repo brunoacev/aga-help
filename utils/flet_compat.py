@@ -27,9 +27,11 @@ def get_alignment_center():
 
 def border_all(color: str, width: int = 1):
     """Borda uniforme compatível."""
-    if hasattr(ft, "Border"):
+    if hasattr(ft, "Border") and hasattr(ft.Border, "all"):
         return ft.Border.all(width, color)
-    return ft.border.all(width, color)
+    if hasattr(ft, "border") and hasattr(ft.border, "all"):
+        return ft.border.all(width, color)
+    return ft.Border.all(width, color)
 
 
 def make_button(text: str, on_click, *, icon=None, bgcolor=None, color=None, style=None):

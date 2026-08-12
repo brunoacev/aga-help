@@ -22,7 +22,9 @@ from utils.whatsapp_audio import play_audio_from_url
 
 QR_INSTRUCTIONS = "Abra o WhatsApp > Aparelhos conectados > Conectar um aparelho"
 NODE_DOWNLOAD_URL = "https://nodejs.org/"
-LEFT_PANEL_WIDTH = 360
+LEFT_PANEL_MIN_WIDTH = 300
+LEFT_PANEL_MAX_WIDTH = 380
+LEFT_PANEL_WIDTH_RATIO = 0.28
 POLL_INTERVAL_SECONDS = 2
 
 
@@ -42,6 +44,7 @@ class WhatsAppView(ft.Container):
         self._selected_is_group = False
         self._chat_filter = ""
         self._group_icon = getattr(ft.Icons, "GROUPS", None) or getattr(ft.Icons, "SUPERGROUP", None) or "groups"
+        self._resize_handler = None
 
         self.node_alert = ft.Container(
             visible=False,
@@ -205,8 +208,39 @@ class WhatsAppView(ft.Container):
             ),
         )
 
-        left_panel = ft.Container(
-            width=LEFT_PANEL_WIDTH,
+        self.messages_area = ft.Container(
+            content=self.messages_list,
+            expand=True,
+            bgcolor=colors.WA_CHAT_BG,
+            border_radius=RADIUS,
+        )
+        self.chat_body = ft.Column(
+            [
+                ft.Container(
+                    bgcolor=colors.WA_PANEL_BG,
+                    border_radius=RADIUS,
+                    padding=make_padding_symmetric(horizontal=S3, vertical=S2),
+                    content=self.chat_header,
+                ),
+                ft.Stack(
+                    [
+                        self.messages_area,
+                        ft.Container(
+                            content=self.chat_empty_hint,
+                            alignment=get_alignment_center(),
+                            expand=True,
+                        ),
+                    ],
+                    expand=True,
+                ),
+                self.compose_row,
+            ],
+            spacing=S2,
+            expand=True,
+        )
+
+        self.left_panel = ft.Container(
+            width=self._left_panel_width(),
             bgcolor=colors.WA_PANEL_BG,
             border=self.border_all,
             border_radius=RADIUS,
@@ -228,27 +262,20 @@ class WhatsAppView(ft.Container):
             ),
         )
 
-        chat_panel = ft.Container(
+        self.chat_panel = ft.Container(
             expand=True,
             bgcolor=colors.WA_CHAT_BG,
             border=self.border_all,
             border_radius=RADIUS,
             padding=make_padding_symmetric(horizontal=S3, vertical=S3),
-            content=ft.Column(
-                [
-                    ft.Container(
-                        bgcolor=colors.WA_PANEL_BG,
-                        border_radius=RADIUS,
-                        padding=make_padding_symmetric(horizontal=S3, vertical=S2),
-                        content=self.chat_header,
-                    ),
-                    ft.Container(content=self.messages_list, expand=True),
-                    self.chat_empty_hint,
-                    self.compose_row,
-                ],
-                spacing=S2,
-                expand=True,
-            ),
+            content=self.chat_body,
+        )
+
+        self.main_row = ft.Row(
+            [self.left_panel, self.chat_panel],
+            spacing=S4,
+            expand=True,
+            vertical_alignment=ft.CrossAxisAlignment.STRETCH,
         )
 
         super().__init__(
@@ -261,25 +288,71 @@ class WhatsAppView(ft.Container):
                         "WhatsApp / Conversas",
                         "Chat em tempo real — mensagens novas aparecem sempre por último.",
                     ),
-                    ft.Row(
-                        [left_panel, chat_panel],
-                        spacing=S4,
-                        expand=True,
-                        vertical_alignment=ft.CrossAxisAlignment.STRETCH,
-                    ),
+                    self.main_row,
                 ],
                 spacing=S4,
                 expand=True,
             ),
         )
 
+    def _left_panel_width(self) -> int:
+        page_width = getattr(self.app_page, "width", None) or 1280
+        return max(
+            LEFT_PANEL_MIN_WIDTH,
+            min(LEFT_PANEL_MAX_WIDTH, int(page_width * LEFT_PANEL_WIDTH_RATIO)),
+        )
+
+    def _bubble_max_width(self) -> int:
+        page_width = getattr(self.app_page, "width", None) or 1280
+        left_width = self._left_panel_width()
+        available = max(320, page_width - left_width - 120)
+        return min(520, int(available * 0.72))
+
     def on_show(self) -> None:
         self._polling = True
-        if self.app_page:
-            self.app_page.run_task(self._poll_connection_loop)
+        if not self.app_page:
+            return
+        self._attach_resize_handler()
+        self.left_panel.width = self._left_panel_width()
+        self.app_page.run_task(self._poll_connection_loop)
 
     def will_unmount(self) -> None:
         self._polling = False
+        self._detach_resize_handler()
+
+    def _attach_resize_handler(self) -> None:
+        if not self.app_page:
+            return
+        self._detach_resize_handler()
+
+        def _on_resize(_e) -> None:
+            self.left_panel.width = self._left_panel_width()
+            self._update_ui()
+
+        self._resize_handler = _on_resize
+        if hasattr(self.app_page, "on_resize"):
+            previous = getattr(self.app_page, "on_resize", None)
+            if previous and previous is not _on_resize:
+                def _chained(e):
+                    if callable(previous):
+                        previous(e)
+                    _on_resize(e)
+
+                self._resize_handler = _chained
+                self.app_page.on_resize = _chained
+            else:
+                self.app_page.on_resize = _on_resize
+        elif hasattr(self.app_page, "window") and hasattr(self.app_page.window, "on_resize"):
+            self.app_page.window.on_resize = _on_resize
+
+    def _detach_resize_handler(self) -> None:
+        if not self.app_page or not self._resize_handler:
+            return
+        if getattr(self.app_page, "on_resize", None) is self._resize_handler:
+            self.app_page.on_resize = None
+        if hasattr(self.app_page, "window") and getattr(self.app_page.window, "on_resize", None) is self._resize_handler:
+            self.app_page.window.on_resize = None
+        self._resize_handler = None
 
     async def _poll_connection_loop(self) -> None:
         if not self.controller.node_available:
@@ -287,7 +360,9 @@ class WhatsAppView(ft.Container):
             self._render_page()
             return
 
-        started, error = self.controller.ensure_bridge_started()
+        self._set_status_label("Iniciando ponte WhatsApp...", colors.WA_LIST_PREVIEW)
+        self._render_page()
+        started, error = await asyncio.to_thread(self.controller.ensure_bridge_started)
         if not started:
             self.lbl_connection_status.value = error or "Falha ao iniciar ponte WhatsApp."
             self.lbl_connection_status.color = colors.ERROR
@@ -344,13 +419,18 @@ class WhatsAppView(ft.Container):
         self.txt_message.disabled = not enabled
         self.btn_send.disabled = not enabled
 
-    def _render_page(self) -> None:
-        if not self.app_page or not self._polling:
+    def _update_ui(self) -> None:
+        if not self.app_page:
             return
         try:
-            self.app_page.update()
+            self.update()
         except RuntimeError:
-            self._polling = False
+            pass
+
+    def _render_page(self) -> None:
+        if not self._polling:
+            return
+        self._update_ui()
 
     async def _scroll_chat_to_bottom(self, duration: int = 300) -> None:
         if not self.messages_list.controls:
@@ -369,25 +449,12 @@ class WhatsAppView(ft.Container):
             self.app_page.run_task(self._scroll_chat_to_bottom, duration)
 
     def _on_search_conversations(self, e) -> None:
-        self._chat_filter = (e.control.value or "").strip().lower()
+        self._chat_filter = (e.control.value or "").strip()
         self._render_conversation_list()
-        self._render_page()
+        self._update_ui()
 
     def _filtered_conversations(self) -> list[WhatsAppConversation]:
-        conversations = self.controller.list_conversations()
-        if not self._chat_filter:
-            return conversations
-        return [
-            item
-            for item in conversations
-            if self._chat_filter in item.name.lower()
-            or self._chat_filter in (item.contact_name or "").lower()
-            or self._chat_filter in item.phone.lower()
-            or self._chat_filter in (item.group_name or "").lower()
-            or self._chat_filter in format_br_phone(item.phone).lower()
-            or self._chat_filter in item.last_message.lower()
-            or (item.is_group and self._chat_filter in "grupo")
-        ]
+        return self.controller.filter_conversations(self._chat_filter)
 
     def _render_conversation_list(self) -> None:
         conversations = self._filtered_conversations()
@@ -489,25 +556,24 @@ class WhatsAppView(ft.Container):
             padding=make_padding_symmetric(horizontal=S2, vertical=S2),
             border_radius=RADIUS,
             bgcolor=colors.WA_LIST_ACTIVE if is_active else colors.WA_PANEL_BG,
+            on_click=lambda _e, cid=conversation.id: self._on_conversation_click(cid),
+            ink=True,
         )
 
         def on_hover(e, container=tile, active=is_active):
+            if active:
+                return
             container.bgcolor = (
-                colors.WA_LIST_ACTIVE
-                if active
-                else (colors.WA_INCOMING_BUBBLE if e.data == "true" else colors.WA_PANEL_BG)
+                colors.WA_INCOMING_BUBBLE if e.data == "true" else colors.WA_PANEL_BG
             )
             try:
                 container.update()
             except RuntimeError:
                 pass
 
-        return ft.GestureDetector(
+        return ft.Container(
             content=tile,
-            mouse_cursor=ft.MouseCursor.CLICK,
-            on_tap=lambda _e, cid=conversation.id: self._select_conversation(cid),
             on_hover=on_hover,
-            expand=True,
         )
 
     def _sender_label(self, message: WhatsAppMessage) -> str:
@@ -569,7 +635,7 @@ class WhatsAppView(ft.Container):
                     bgcolor=bubble_bg,
                     border_radius=RADIUS,
                     padding=make_padding_symmetric(horizontal=S3, vertical=S2),
-                    width=360,
+                    width=self._bubble_max_width(),
                 ),
             ],
             alignment=alignment,
@@ -669,12 +735,33 @@ class WhatsAppView(ft.Container):
             self._render_page()
         return appended
 
-    def _select_conversation(self, conversation_id: str, *, update: bool = True) -> None:
+    def _on_conversation_click(self, conversation_id: str) -> None:
+        if self.app_page:
+            self.app_page.run_task(self._select_conversation_async, conversation_id)
+        else:
+            self._apply_conversation_selection(conversation_id, [])
+
+    async def _select_conversation_async(self, conversation_id: str) -> None:
+        conversation = await asyncio.to_thread(self.controller.set_active_chat, conversation_id)
+        if not conversation:
+            conversations = await asyncio.to_thread(self.controller.list_conversations)
+            conversation = next((item for item in conversations if item.id == conversation_id), None)
+        if not conversation:
+            return
+
+        messages = await asyncio.to_thread(self.controller.get_messages, conversation_id)
+        await asyncio.to_thread(self.controller.mark_conversation_read, conversation_id)
+        self._apply_conversation_selection(conversation_id, messages, conversation=conversation)
+
+    def _apply_conversation_selection(
+        self,
+        conversation_id: str,
+        messages: list[WhatsAppMessage],
+        *,
+        conversation: WhatsAppConversation | None = None,
+    ) -> None:
         self.selected_conversation_id = conversation_id
-        conversation = next(
-            (item for item in self.controller.list_conversations() if item.id == conversation_id),
-            None,
-        )
+        conversation = conversation or self.controller.get_active_conversation()
         if not conversation:
             return
 
@@ -685,13 +772,24 @@ class WhatsAppView(ft.Container):
             self.chat_header_text.value = contact_name
         else:
             phone = self._conversation_phone_line(conversation)
-            self.chat_header_text.value = f"{contact_name}  ·  {phone}" if phone and phone != contact_name else contact_name
-        self.controller.mark_conversation_read(conversation_id)
-        self._reset_chat_messages(conversation_id)
+            self.chat_header_text.value = (
+                f"{contact_name}  ·  {phone}" if phone and phone != contact_name else contact_name
+            )
+
+        self.messages_list.controls.clear()
+        self._sync_index[conversation_id] = 0
+        self._pending_optimistic.pop(conversation_id, None)
+        for message in messages:
+            self._append_message_bubble(message, scroll=False)
+        self._sync_index[conversation_id] = len(messages)
+        self.chat_empty_hint.visible = not messages
         self._set_compose_enabled(self._last_status == STATUS_CONNECTED)
         self._render_conversation_list()
-        if update:
-            self._render_page()
+        self._schedule_scroll_to_bottom()
+        self._update_ui()
+
+    def _select_conversation(self, conversation_id: str, *, update: bool = True) -> None:
+        self._on_conversation_click(conversation_id)
 
     def _on_send_message(self, _e) -> None:
         if not self.selected_conversation_id:
@@ -745,6 +843,7 @@ class WhatsAppView(ft.Container):
         self._pending_optimistic.clear()
         self._selected_is_group = False
         self.selected_conversation_id = None
+        self.controller.clear_active_chat()
         self.messages_list.controls.clear()
         self._set_compose_enabled(False)
         show_snackbar(self.app_page, "Sessão WhatsApp encerrada.", success=True)

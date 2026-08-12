@@ -17,8 +17,10 @@ BRIDGE_PORT = int(os.getenv("WHATSAPP_BRIDGE_PORT", "5001"))
 BRIDGE_BASE_URL = f"http://127.0.0.1:{BRIDGE_PORT}"
 BRIDGE_DIR = Path(__file__).resolve().parent.parent / "whatsapp_bridge"
 BRIDGE_ENTRY = BRIDGE_DIR / "index.js"
+BRIDGE_LOG = BRIDGE_DIR / "bridge_stderr.log"
 NODE_DOWNLOAD_URL = "https://nodejs.org/"
 REQUEST_TIMEOUT = 8
+READY_TIMEOUT_SECONDS = 45.0
 
 
 class WhatsAppBridgeProcess:
@@ -35,6 +37,26 @@ class WhatsAppBridgeProcess:
         return cls._process is not None and cls._process.poll() is None
 
     @classmethod
+    def is_bridge_responding(cls) -> bool:
+        try:
+            response = requests.get(f"{BRIDGE_BASE_URL}/health", timeout=1.5)
+            return response.ok
+        except requests.RequestException:
+            return False
+
+    @classmethod
+    def _read_bridge_log_tail(cls, max_chars: int = 600) -> str:
+        if not BRIDGE_LOG.exists():
+            return ""
+        try:
+            text = BRIDGE_LOG.read_text(encoding="utf-8", errors="replace").strip()
+            if len(text) <= max_chars:
+                return text
+            return text[-max_chars:]
+        except OSError:
+            return ""
+
+    @classmethod
     def ensure_dependencies(cls) -> tuple[bool, str]:
         if not cls.is_node_installed():
             return False, "Node.js não encontrado."
@@ -45,7 +67,7 @@ class WhatsAppBridgeProcess:
         if not npm:
             return False, "npm não encontrado. Instale o Node.js completo."
         result = subprocess.run(
-            [npm, "install"],
+            [npm, "install", "--foreground-scripts"],
             cwd=str(BRIDGE_DIR),
             capture_output=True,
             text=True,
@@ -63,20 +85,37 @@ class WhatsAppBridgeProcess:
             return False, error
         if cls.is_running():
             return True, ""
+        if cls.is_bridge_responding():
+            return True, ""
         if not BRIDGE_ENTRY.exists():
             return False, "Arquivo whatsapp_bridge/index.js não encontrado."
 
+        try:
+            BRIDGE_LOG.write_text("", encoding="utf-8")
+        except OSError:
+            pass
+
+        log_handle = open(BRIDGE_LOG, "a", encoding="utf-8")
         kwargs: dict = {
             "cwd": str(BRIDGE_DIR),
             "stdout": subprocess.DEVNULL,
-            "stderr": subprocess.DEVNULL,
+            "stderr": log_handle,
         }
         if sys.platform == "win32" and hasattr(subprocess, "CREATE_NO_WINDOW"):
             kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
 
         cls._process = subprocess.Popen(["node", str(BRIDGE_ENTRY)], **kwargs)
-        if not cls.wait_until_ready(timeout=35):
-            return False, "Ponte WhatsApp não respondeu a tempo."
+        if not cls.wait_until_ready(timeout=READY_TIMEOUT_SECONDS):
+            exit_code = cls._process.poll() if cls._process else None
+            log_tail = cls._read_bridge_log_tail()
+            cls.stop()
+            if exit_code is not None:
+                detail = log_tail or f"Processo encerrou com código {exit_code}."
+                return False, f"Ponte WhatsApp encerrou inesperadamente: {detail}"
+            if cls.is_bridge_responding():
+                return True, ""
+            detail = log_tail or "Verifique se a porta 5001 está livre."
+            return False, f"Ponte WhatsApp não respondeu a tempo. {detail}"
         return True, ""
 
     @classmethod

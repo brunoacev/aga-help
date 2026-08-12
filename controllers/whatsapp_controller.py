@@ -58,6 +58,8 @@ class WhatsAppController:
         self.client = WhatsAppBridgeClient()
         self.bridge_error = ""
         self.last_qr = ""
+        self.active_chat_id: str | None = None
+        self._conversations_cache: list[WhatsAppConversation] = []
 
     @property
     def node_available(self) -> bool:
@@ -143,7 +145,53 @@ class WhatsAppController:
                     contact_name="" if is_group else contact_name,
                 )
             )
+        self._conversations_cache = conversations
         return conversations
+
+    def get_cached_conversations(self) -> list[WhatsAppConversation]:
+        return list(self._conversations_cache)
+
+    def set_active_chat(self, conversation_id: str) -> WhatsAppConversation | None:
+        clean_id = (conversation_id or "").strip()
+        self.active_chat_id = clean_id or None
+        return self.get_active_conversation()
+
+    def get_active_conversation(self) -> WhatsAppConversation | None:
+        if not self.active_chat_id:
+            return None
+        for conversation in self._conversations_cache:
+            if conversation.id == self.active_chat_id:
+                return conversation
+        refreshed = self.list_conversations()
+        for conversation in refreshed:
+            if conversation.id == self.active_chat_id:
+                return conversation
+        return None
+
+    def clear_active_chat(self) -> None:
+        self.active_chat_id = None
+
+    def filter_conversations(self, query: str) -> list[WhatsAppConversation]:
+        conversations = self._conversations_cache or self.list_conversations()
+        needle = (query or "").strip().lower()
+        if not needle:
+            return conversations
+        filtered: list[WhatsAppConversation] = []
+        for item in conversations:
+            haystack = (
+                item.name.lower(),
+                (item.contact_name or "").lower(),
+                item.phone.lower(),
+                (item.group_name or "").lower(),
+                format_br_phone(item.phone).lower(),
+                item.last_message.lower(),
+                item.id.lower(),
+            )
+            if any(needle in value for value in haystack if value):
+                filtered.append(item)
+            elif item.is_group and needle in "grupo":
+                filtered.append(item)
+        return filtered
 
     def get_messages(self, conversation_id: str) -> list[WhatsAppMessage]:
         if not conversation_id:

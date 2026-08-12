@@ -167,6 +167,56 @@ def test_ensure_bridge_started(_mock_start, _mock_node):
     assert error == ""
 
 
+def test_set_active_chat_and_lookup():
+    controller = WhatsAppController()
+    controller.client = MagicMock()
+    controller.client.list_chats.return_value = [
+        {
+            "id": "5585999999999@s.whatsapp.net",
+            "name": "Maria Silva",
+            "contact_name": "Maria Silva",
+            "phone": "+5585999999999",
+            "last_message": "Olá",
+            "unread": 0,
+            "is_group": False,
+        }
+    ]
+    conversation = controller.set_active_chat("5585999999999@s.whatsapp.net")
+    assert conversation is not None
+    assert controller.active_chat_id == "5585999999999@s.whatsapp.net"
+    assert controller.get_active_conversation() == conversation
+
+
+def test_filter_conversations_case_insensitive():
+    controller = WhatsAppController()
+    controller.client = MagicMock()
+    controller.client.list_chats.return_value = [
+        {
+            "id": "5585999999999@s.whatsapp.net",
+            "name": "Maria Silva",
+            "contact_name": "Maria Silva",
+            "phone": "+5585999999999",
+            "last_message": "Olá",
+            "unread": 0,
+            "is_group": False,
+        },
+        {
+            "id": "120363012345678901@g.us",
+            "name": "Equipe Agatek",
+            "phone": "",
+            "group_name": "Equipe Agatek",
+            "last_message": "Bom dia",
+            "unread": 0,
+            "is_group": True,
+        },
+    ]
+    controller.list_conversations()
+    filtered = controller.filter_conversations("maria")
+    assert len(filtered) == 1
+    assert filtered[0].contact_name == "Maria Silva"
+    assert len(controller.filter_conversations("")) == 2
+
+
 def test_qr_data_uri_helper():
     uri = qr_data_uri("session-token")
     assert uri.startswith("data:image/png;base64,")

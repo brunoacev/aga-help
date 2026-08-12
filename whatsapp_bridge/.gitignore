@@ -1,3 +1,4 @@
 node_modules/
 auth_info/
 media_cache/
+bridge_stderr.log

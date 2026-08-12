@@ -19,7 +19,7 @@ from views.login_view import LoginView
 from views.logs_view import LogsView
 from views.materials_view import MaterialsView
 from views.whatsapp_view import WhatsAppView
-from utils.flet_compat import confirm_dialog, make_padding_symmetric
+from utils.flet_compat import border_all, confirm_dialog, make_padding_symmetric
 from utils.ui_theme import S2, apply_app_theme
 
 try:
@@ -56,7 +56,7 @@ def _offline_banner() -> ft.Container | None:
             spacing=S2,
         ),
         bgcolor=colors.BG_SURFACE,
-        border=ft.border.all(1, colors.COLOR_ORCAMENTO),
+        border=border_all(colors.COLOR_ORCAMENTO),
         border_radius=8,
         padding=make_padding_symmetric(horizontal=12, vertical=8),
     )
