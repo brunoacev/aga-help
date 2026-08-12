@@ -10,6 +10,7 @@ from core.services.order_service import clear_all_orders
 from components.sidebar import Sidebar
 from components.order_form.quick_order_bar import QuickOrderBar
 from views.agenda_view import AgendaView
+from views.commissions_view import CommissionsView
 from views.kanban_view import KanbanView
 from views.logs_view import LogsView
 from views.materials_view import MaterialsView
@@ -58,6 +59,7 @@ def main(page: ft.Page) -> None:
     agenda_view = AgendaView(page)
     materials_view = MaterialsView()
     logs_view = LogsView()
+    commissions_view = CommissionsView()
 
     def navigate_to(view_name: str) -> None:
         sidebar.set_active(view_name)
@@ -74,6 +76,9 @@ def main(page: ft.Page) -> None:
         elif view_name == "logs":
             content_area.content = logs_view
             logs_view.refresh()
+        elif view_name == "commissions":
+            content_area.content = commissions_view
+            commissions_view.refresh()
         page.update()
 
     def on_clear_database():

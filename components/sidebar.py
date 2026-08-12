@@ -25,6 +25,12 @@ NAV_SECTIONS: tuple[tuple[str, tuple[tuple[str, str, str, str], ...]], ...] = (
             ("agenda", "Agenda de Contatos", "CONTACTS_ROUNDED", "contacts"),
         ),
     ),
+    (
+        "GESTÃO / OPERACIONAL",
+        (
+            ("commissions", "Comissões", "PAYMENTS_ROUNDED", "payments"),
+        ),
+    ),
 )
 
 

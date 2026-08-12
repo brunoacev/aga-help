@@ -67,11 +67,22 @@ def get_orders() -> list[dict]:
 
 def update_order_status(order_id: int, new_status: str) -> None:
     """Atualiza o status de um pedido."""
+    clean_status = sanitize_text(new_status, max_length=30)
     with get_connection() as conn:
-        conn.execute(
-            "UPDATE orders SET status = ? WHERE id = ?",
-            (sanitize_text(new_status, max_length=30), order_id),
-        )
+        if clean_status == "Faturado":
+            conn.execute(
+                """
+                UPDATE orders
+                SET status = ?, billed_at = ?
+                WHERE id = ?
+                """,
+                (clean_status, datetime.now().strftime("%Y-%m-%d %H:%M"), order_id),
+            )
+        else:
+            conn.execute(
+                "UPDATE orders SET status = ? WHERE id = ?",
+                (clean_status, order_id),
+            )
         conn.commit()
 
 

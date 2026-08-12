@@ -50,12 +50,14 @@ def init_db() -> None:
             )
             """
         )
-        for col in ["phone", "address", "width", "height", "items_json", "service_type"]:
+        for col in ["phone", "address", "width", "height", "items_json", "service_type", "payment_status", "billed_at"]:
             try:
                 if col == "items_json":
                     default = "'[]'"
                 elif col == "service_type":
                     default = "'componentes'"
+                elif col == "payment_status":
+                    default = "'Pendente'"
                 else:
                     default = "''"
                 conn.execute(f"ALTER TABLE orders ADD COLUMN {col} TEXT DEFAULT {default}")
