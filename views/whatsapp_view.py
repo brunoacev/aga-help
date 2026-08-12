@@ -12,19 +12,20 @@ from controllers.whatsapp_controller import (
     STATUS_QR_READY,
     WhatsAppController,
     WhatsAppConversation,
+    WhatsAppMessage,
 )
 from core import colors
 from utils.flet_compat import border_all, get_alignment_center, make_padding_symmetric, show_snackbar
-from utils.ui_theme import FONT_BODY, FONT_CAPTION, RADIUS, S1, S2, S3, S4, field_style, page_header, text_caption, text_section_heading
+from utils.ui_theme import FONT_BODY, FONT_CAPTION, RADIUS, S1, S2, S3, S4, field_style, page_header, text_section_heading
 
 QR_INSTRUCTIONS = "Abra o WhatsApp > Aparelhos conectados > Conectar um aparelho"
 NODE_DOWNLOAD_URL = "https://nodejs.org/"
-LEFT_PANEL_WIDTH = 340
+LEFT_PANEL_WIDTH = 360
 POLL_INTERVAL_SECONDS = 2
 
 
 class WhatsAppView(ft.Container):
-    """Painel de conversas e chat com ponte local Baileys."""
+    """Painel de conversas e chat estilo WhatsApp Web."""
 
     def __init__(self, page: ft.Page):
         self.app_page = page
@@ -34,10 +35,12 @@ class WhatsAppView(ft.Container):
         self._polling = False
         self._last_status = STATUS_DISCONNECTED
         self._last_qr_src = ""
+        self._message_signatures: dict[str, str] = {}
+        self._chat_filter = ""
 
         self.node_alert = ft.Container(
             visible=False,
-            bgcolor=colors.BG_SURFACE_LIGHT,
+            bgcolor=colors.WA_PANEL_BG,
             border=border_all(colors.ERROR),
             border_radius=RADIUS,
             padding=S4,
@@ -52,12 +55,9 @@ class WhatsAppView(ft.Container):
                     ft.Text(
                         "Instale o Node.js LTS para habilitar o WhatsApp real.",
                         size=FONT_CAPTION,
-                        color=colors.TEXT_SECONDARY,
+                        color=colors.WA_LIST_PREVIEW,
                     ),
-                    ft.TextButton(
-                        content="Baixar Node.js",
-                        url=NODE_DOWNLOAD_URL,
-                    ),
+                    ft.TextButton(content="Baixar Node.js", url=NODE_DOWNLOAD_URL),
                 ],
                 spacing=S2,
                 tight=True,
@@ -75,18 +75,23 @@ class WhatsAppView(ft.Container):
         self.lbl_connection_status = ft.Text(
             "Iniciando ponte...",
             size=FONT_CAPTION,
-            color=colors.TEXT_MUTED,
+            color=colors.WA_LIST_PREVIEW,
             weight=ft.FontWeight.W_600,
         )
         self.qr_panel = ft.Column(
             [
                 ft.Container(content=self.qr_image, alignment=get_alignment_center()),
-                ft.Text(QR_INSTRUCTIONS, size=FONT_CAPTION, color=colors.TEXT_MUTED, text_align=ft.TextAlign.CENTER),
+                ft.Text(
+                    QR_INSTRUCTIONS,
+                    size=FONT_CAPTION,
+                    color=colors.WA_LIST_PREVIEW,
+                    text_align=ft.TextAlign.CENTER,
+                ),
                 ft.Button(
                     content="Gerar Novo QrCode",
                     icon=getattr(ft.Icons, "QR_CODE_SCANNER", None) or "qr_code_scanner",
-                    bgcolor=colors.PRIMARY,
-                    color=colors.TEXT_PRIMARY,
+                    bgcolor=colors.WA_ACCENT,
+                    color=colors.WA_BUBBLE_TEXT,
                     on_click=self._on_generate_qr,
                 ),
             ],
@@ -97,13 +102,13 @@ class WhatsAppView(ft.Container):
         self.lbl_connected_badge = ft.Container(
             content=ft.Row(
                 [
-                    ft.Icon(getattr(ft.Icons, "CHECK_CIRCLE", None) or "check_circle", color=colors.SUCCESS, size=18),
-                    ft.Text("", size=FONT_BODY, color=colors.SUCCESS, weight=ft.FontWeight.W_600),
+                    ft.Icon(getattr(ft.Icons, "VERIFIED", None) or "verified", color=colors.WA_ACCENT, size=18),
+                    ft.Text("", size=FONT_BODY, color=colors.WA_BUBBLE_TEXT, weight=ft.FontWeight.W_600),
                 ],
                 spacing=S2,
             ),
-            bgcolor=colors.BG_SURFACE_LIGHT,
-            border=border_all(colors.SUCCESS),
+            bgcolor=colors.WA_INCOMING_BUBBLE,
+            border=border_all(colors.WA_ACCENT),
             border_radius=RADIUS,
             padding=make_padding_symmetric(horizontal=S3, vertical=S2),
             visible=False,
@@ -122,44 +127,75 @@ class WhatsAppView(ft.Container):
             visible=False,
         )
 
-        self.conversations_column = ft.Column(spacing=S2, scroll=ft.ScrollMode.AUTO, expand=True)
+        self.txt_search = ft.TextField(
+            hint_text="Buscar conversa...",
+            prefix_icon=getattr(ft.Icons, "SEARCH", None) or "search",
+            on_change=self._on_search_conversations,
+            **field_style(),
+        )
+        self.conversations_column = ft.Column(spacing=S1, scroll=ft.ScrollMode.AUTO, expand=True)
         self.chat_header = ft.Text(
             "Selecione uma conversa",
             size=FONT_BODY,
-            color=colors.TEXT_PRIMARY,
+            color=colors.WA_LIST_NAME,
             weight=ft.FontWeight.W_600,
         )
-        self.messages_column = ft.Column(spacing=S2, scroll=ft.ScrollMode.AUTO, expand=True)
-        self.chat_empty_hint = text_caption("Nenhuma conversa selecionada.")
-        self.txt_message = ft.TextField(
-            label="Mensagem",
-            hint_text="Digite sua resposta...",
+        self.messages_list = ft.ListView(
             expand=True,
-            multiline=False,
+            spacing=S2,
+            padding=make_padding_symmetric(horizontal=S2, vertical=S2),
+            auto_scroll=True,
+        )
+        self.chat_empty_hint = ft.Text(
+            "Selecione uma conversa para ver as mensagens.",
+            size=FONT_CAPTION,
+            color=colors.WA_LIST_PREVIEW,
+            visible=True,
+        )
+        self.txt_message = ft.TextField(
+            hint_text="Digite uma mensagem",
+            expand=True,
+            multiline=True,
+            min_lines=1,
+            max_lines=4,
             disabled=True,
             on_submit=self._on_send_message,
             **field_style(),
         )
-        self.btn_send = ft.Button(
-            content="Enviar",
+        self.btn_send = ft.IconButton(
             icon=getattr(ft.Icons, "SEND_ROUNDED", None) or "send",
-            bgcolor=colors.PRIMARY,
-            color=colors.TEXT_PRIMARY,
+            icon_color=colors.WA_BUBBLE_TEXT,
+            bgcolor=colors.WA_ACCENT,
+            tooltip="Enviar",
             disabled=True,
             on_click=self._on_send_message,
         )
-        self.compose_row = ft.Row(
-            [self.txt_message, self.btn_send],
-            spacing=S2,
-            vertical_alignment=ft.CrossAxisAlignment.END,
+        self.compose_row = ft.Container(
+            bgcolor=colors.WA_PANEL_BG,
+            border_radius=RADIUS,
+            padding=make_padding_symmetric(horizontal=S2, vertical=S2),
+            content=ft.Row(
+                [
+                    ft.IconButton(
+                        icon=getattr(ft.Icons, "ATTACH_FILE", None) or "attach_file",
+                        icon_color=colors.WA_LIST_PREVIEW,
+                        tooltip="Anexo (em breve)",
+                        disabled=True,
+                    ),
+                    self.txt_message,
+                    self.btn_send,
+                ],
+                spacing=S2,
+                vertical_alignment=ft.CrossAxisAlignment.END,
+            ),
         )
 
         left_panel = ft.Container(
             width=LEFT_PANEL_WIDTH,
-            bgcolor=colors.BG_SURFACE,
+            bgcolor=colors.WA_PANEL_BG,
             border=self.border_all,
             border_radius=RADIUS,
-            padding=S4,
+            padding=S3,
             content=ft.Column(
                 [
                     text_section_heading("Status da Conexão"),
@@ -168,7 +204,8 @@ class WhatsAppView(ft.Container):
                     self.qr_panel,
                     self.connected_panel,
                     ft.Divider(height=1, color=colors.BORDER_COLOR),
-                    text_section_heading("Conversas Ativas"),
+                    text_section_heading("Conversas"),
+                    self.txt_search,
                     ft.Container(content=self.conversations_column, expand=True),
                 ],
                 spacing=S3,
@@ -176,21 +213,25 @@ class WhatsAppView(ft.Container):
             ),
         )
 
-        right_panel = ft.Container(
+        chat_panel = ft.Container(
             expand=True,
-            bgcolor=colors.BG_SURFACE,
+            bgcolor=colors.WA_CHAT_BG,
             border=self.border_all,
             border_radius=RADIUS,
-            padding=S4,
+            padding=make_padding_symmetric(horizontal=S3, vertical=S3),
             content=ft.Column(
                 [
-                    self.chat_header,
-                    ft.Divider(height=1, color=colors.BORDER_COLOR),
-                    ft.Container(content=self.messages_column, expand=True),
+                    ft.Container(
+                        bgcolor=colors.WA_PANEL_BG,
+                        border_radius=RADIUS,
+                        padding=make_padding_symmetric(horizontal=S3, vertical=S2),
+                        content=self.chat_header,
+                    ),
+                    ft.Container(content=self.messages_list, expand=True),
                     self.chat_empty_hint,
                     self.compose_row,
                 ],
-                spacing=S3,
+                spacing=S2,
                 expand=True,
             ),
         )
@@ -203,10 +244,10 @@ class WhatsAppView(ft.Container):
                 [
                     page_header(
                         "WhatsApp / Conversas",
-                        "Conexão real via ponte local (Baileys) — leia o QR Code no celular.",
+                        "Chat em tempo real — mensagens novas aparecem sempre por último.",
                     ),
                     ft.Row(
-                        [left_panel, right_panel],
+                        [left_panel, chat_panel],
                         spacing=S4,
                         expand=True,
                         vertical_alignment=ft.CrossAxisAlignment.STRETCH,
@@ -218,7 +259,6 @@ class WhatsAppView(ft.Container):
         )
 
     def on_show(self) -> None:
-        """Inicia ponte e polling ao navegar para esta view."""
         self._polling = True
         if self.app_page:
             self.app_page.run_task(self._poll_connection_loop)
@@ -259,11 +299,11 @@ class WhatsAppView(ft.Container):
                 self.qr_panel.visible = False
                 self.connected_panel.visible = True
                 self.qr_image.visible = False
-                self._set_status_label("Conectado", colors.SUCCESS)
+                self._set_status_label("Conectado", colors.WA_ACCENT)
                 self._set_compose_enabled(bool(self.selected_conversation_id))
-                self._load_conversations()
+                self._render_conversation_list()
                 if self.selected_conversation_id:
-                    self._refresh_messages(self.selected_conversation_id, update=False)
+                    self._refresh_messages(self.selected_conversation_id, scroll_to_bottom=True, update=False)
             else:
                 self._set_status_label("Desconectado", colors.ERROR)
                 self.qr_panel.visible = True
@@ -293,60 +333,88 @@ class WhatsAppView(ft.Container):
         if self.app_page:
             self.app_page.update()
 
-    def _render_conversation_list(self) -> None:
-        """Atualiza apenas os tiles da lista lateral (sem re-selecionar chat)."""
+    def _on_search_conversations(self, e) -> None:
+        self._chat_filter = (e.control.value or "").strip().lower()
+        self._render_conversation_list()
+        self._render_page()
+
+    def _filtered_conversations(self) -> list[WhatsAppConversation]:
         conversations = self.controller.list_conversations()
+        if not self._chat_filter:
+            return conversations
+        return [
+            item
+            for item in conversations
+            if self._chat_filter in item.name.lower()
+            or self._chat_filter in item.phone.lower()
+            or self._chat_filter in item.last_message.lower()
+        ]
+
+    def _render_conversation_list(self) -> None:
+        conversations = self._filtered_conversations()
         self.conversations_column.controls.clear()
         if not conversations:
             self.conversations_column.controls.append(
-                text_caption("Nenhuma conversa encontrada ainda.")
+                ft.Text(
+                    "Nenhuma conversa encontrada.",
+                    size=FONT_CAPTION,
+                    color=colors.WA_LIST_PREVIEW,
+                )
             )
             return
         for conversation in conversations:
             self.conversations_column.controls.append(self._build_conversation_tile(conversation))
 
     def _load_conversations(self) -> None:
-        conversations = self.controller.list_conversations()
+        conversations = self._filtered_conversations()
         self._render_conversation_list()
-
         if not conversations:
             self.selected_conversation_id = None
             self.chat_empty_hint.visible = True
             self._set_compose_enabled(False)
             return
-
         valid_ids = {item.id for item in conversations}
         if self.selected_conversation_id not in valid_ids:
             self._select_conversation(conversations[0].id, update=False)
 
     def _build_conversation_tile(self, conversation: WhatsAppConversation) -> ft.Container:
         is_active = conversation.id == self.selected_conversation_id
-        unread_badge = (
-            ft.Container(
-                content=ft.Text(str(conversation.unread), size=10, color=colors.TEXT_PRIMARY),
-                bgcolor=colors.PRIMARY,
-                border_radius=10,
-                padding=make_padding_symmetric(horizontal=6, vertical=2),
+        preview_color = colors.WA_LIST_NAME if conversation.unread else colors.WA_LIST_PREVIEW
+        trailing = []
+        if conversation.unread:
+            trailing.append(
+                ft.Container(
+                    content=ft.Text(str(conversation.unread), size=10, color=colors.WA_BUBBLE_TEXT),
+                    bgcolor=colors.WA_ACCENT,
+                    border_radius=12,
+                    padding=make_padding_symmetric(horizontal=6, vertical=2),
+                )
             )
-            if conversation.unread
-            else None
-        )
-        trailing = [unread_badge] if unread_badge else []
         return ft.Container(
             content=ft.Row(
                 [
+                    ft.CircleAvatar(
+                        content=ft.Text(
+                            (conversation.name[:1] or "?").upper(),
+                            color=colors.WA_BUBBLE_TEXT,
+                            weight=ft.FontWeight.W_600,
+                        ),
+                        bgcolor=colors.WA_INCOMING_BUBBLE,
+                        radius=18,
+                    ),
                     ft.Column(
                         [
                             ft.Text(
                                 conversation.name,
                                 size=FONT_BODY,
                                 weight=ft.FontWeight.W_600,
-                                color=colors.TEXT_PRIMARY,
+                                color=colors.WA_LIST_NAME,
+                                overflow=ft.TextOverflow.ELLIPSIS,
                             ),
                             ft.Text(
-                                conversation.last_message,
+                                conversation.last_message or "Sem mensagens",
                                 size=FONT_CAPTION,
-                                color=colors.TEXT_MUTED,
+                                color=preview_color,
                                 overflow=ft.TextOverflow.ELLIPSIS,
                             ),
                         ],
@@ -358,36 +426,63 @@ class WhatsAppView(ft.Container):
                 spacing=S2,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
             ),
-            padding=make_padding_symmetric(horizontal=S3, vertical=S2),
+            padding=make_padding_symmetric(horizontal=S2, vertical=S2),
             border_radius=RADIUS,
-            bgcolor=colors.BG_SURFACE_LIGHT if is_active else colors.BG_SURFACE,
-            border=border_all(colors.PRIMARY if is_active else colors.BORDER_COLOR),
+            bgcolor=colors.WA_LIST_ACTIVE if is_active else colors.WA_PANEL_BG,
             ink=True,
             on_click=lambda _, cid=conversation.id: self._select_conversation(cid),
         )
 
-    def _build_message_bubble(self, message) -> ft.Row:
-        bubble_color = colors.PRIMARY if message.from_me else colors.BG_SURFACE_LIGHT
-        alignment = ft.MainAxisAlignment.END if message.from_me else ft.MainAxisAlignment.START
+    def _build_message_bubble(self, message: WhatsAppMessage) -> ft.Control:
+        outgoing = message.from_me
+        bubble_bg = colors.WA_OUTGOING_BUBBLE if outgoing else colors.WA_INCOMING_BUBBLE
+        meta_color = colors.WA_META_OUTGOING if outgoing else colors.WA_META_INCOMING
+        alignment = ft.MainAxisAlignment.END if outgoing else ft.MainAxisAlignment.START
+        status_icon = (
+            ft.Icon(
+                getattr(ft.Icons, "DONE_ALL", None) or "done_all",
+                size=14,
+                color=colors.WA_META_OUTGOING,
+            )
+            if outgoing
+            else None
+        )
+        footer_controls = [
+            ft.Text(message.time, size=10, color=meta_color),
+        ]
+        if status_icon:
+            footer_controls.append(status_icon)
+
         return ft.Row(
             [
                 ft.Container(
                     content=ft.Column(
                         [
-                            ft.Text(message.text, size=FONT_BODY, color=colors.TEXT_PRIMARY),
-                            ft.Text(message.time, size=10, color=colors.TEXT_MUTED),
+                            ft.Text(
+                                message.text,
+                                size=FONT_BODY,
+                                color=colors.WA_BUBBLE_TEXT,
+                                selectable=True,
+                            ),
+                            ft.Row(footer_controls, spacing=S1, alignment=ft.MainAxisAlignment.END),
                         ],
                         spacing=S1,
                         tight=True,
                     ),
-                    bgcolor=bubble_color,
+                    bgcolor=bubble_bg,
                     border_radius=RADIUS,
                     padding=make_padding_symmetric(horizontal=S3, vertical=S2),
-                    width=320,
+                    width=360,
                 ),
             ],
             alignment=alignment,
         )
+
+    def _message_signature(self, messages: list[WhatsAppMessage]) -> str:
+        if not messages:
+            return "empty"
+        last = messages[-1]
+        return f"{len(messages)}:{last.timestamp}:{last.text}:{last.from_me}"
 
     def _select_conversation(self, conversation_id: str, *, update: bool = True) -> None:
         self.selected_conversation_id = conversation_id
@@ -398,19 +493,32 @@ class WhatsAppView(ft.Container):
         if not conversation:
             return
 
-        self.chat_header.value = f"{conversation.name} · {conversation.phone}"
-        self._refresh_messages(conversation_id, update=False)
-        self.chat_empty_hint.visible = not self.messages_column.controls
+        self.chat_header.value = f"{conversation.name}  ·  {conversation.phone}"
+        self.controller.mark_conversation_read(conversation_id)
+        self._refresh_messages(conversation_id, scroll_to_bottom=True, update=False)
+        self.chat_empty_hint.visible = not self.messages_list.controls
         self._set_compose_enabled(self._last_status == STATUS_CONNECTED)
         self._render_conversation_list()
         if update:
             self._render_page()
 
-    def _refresh_messages(self, conversation_id: str, *, update: bool = True) -> None:
-        self.messages_column.controls.clear()
-        for message in self.controller.get_messages(conversation_id):
-            self.messages_column.controls.append(self._build_message_bubble(message))
-        self.chat_empty_hint.visible = not self.messages_column.controls
+    def _refresh_messages(
+        self,
+        conversation_id: str,
+        *,
+        scroll_to_bottom: bool = False,
+        update: bool = True,
+    ) -> None:
+        messages = self.controller.get_messages(conversation_id)
+        signature = self._message_signature(messages)
+        if signature == self._message_signatures.get(conversation_id) and not scroll_to_bottom:
+            return
+        self._message_signatures[conversation_id] = signature
+        self.messages_list.controls.clear()
+        for message in messages:
+            self.messages_list.controls.append(self._build_message_bubble(message))
+
+        self.chat_empty_hint.visible = not messages
         if update:
             self._render_page()
 
@@ -424,7 +532,8 @@ class WhatsAppView(ft.Container):
             show_snackbar(self.app_page, error or "Não foi possível enviar.", success=False)
             return
         self.txt_message.value = ""
-        self._refresh_messages(self.selected_conversation_id, update=False)
+        self._message_signatures.pop(self.selected_conversation_id, None)
+        self._refresh_messages(self.selected_conversation_id, scroll_to_bottom=True, update=False)
         self._render_conversation_list()
         self._render_page()
 
@@ -443,8 +552,9 @@ class WhatsAppView(ft.Container):
             show_snackbar(self.app_page, error or "Falha ao desconectar.", success=False)
             return
         self._last_qr_src = ""
+        self._message_signatures.clear()
         self.selected_conversation_id = None
-        self.messages_column.controls.clear()
+        self.messages_list.controls.clear()
         self._set_compose_enabled(False)
         show_snackbar(self.app_page, "Sessão WhatsApp encerrada.", success=True)
         self._render_page()

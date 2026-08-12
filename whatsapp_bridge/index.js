@@ -13,6 +13,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const AUTH_DIR = path.join(__dirname, "auth_info");
 const PORT = Number(process.env.WHATSAPP_BRIDGE_PORT || 5001);
+const MAX_MESSAGES_PER_CHAT = 300;
 
 const app = express();
 app.use(express.json());
@@ -25,6 +26,7 @@ let starting = false;
 
 const chatStore = new Map();
 const messageStore = new Map();
+const messageKeys = new Map();
 
 function formatPhone(jid) {
   if (!jid) return "";
@@ -39,21 +41,69 @@ function jidFromTarget(target) {
   return `${digits}@s.whatsapp.net`;
 }
 
+function extractMessageText(msg) {
+  const content = msg.message || {};
+  if (content.conversation) return content.conversation;
+  if (content.extendedTextMessage?.text) return content.extendedTextMessage.text;
+  if (content.imageMessage) return content.imageMessage.caption || "📷 Foto";
+  if (content.videoMessage) return content.videoMessage.caption || "🎬 Vídeo";
+  if (content.audioMessage) return content.audioMessage.ptt ? "🎤 Áudio" : "🔊 Áudio";
+  if (content.documentMessage) {
+    return `📄 ${content.documentMessage.fileName || "Documento"}`;
+  }
+  if (content.stickerMessage) return "🎨 Figurinha";
+  if (content.contactMessage) return "👤 Contato";
+  if (content.locationMessage) return "📍 Localização";
+  if (content.reactionMessage) return content.reactionMessage.text || "Reação";
+  return "";
+}
+
 function parseMessage(msg) {
-  const text =
-    msg.message?.conversation ||
-    msg.message?.extendedTextMessage?.text ||
-    msg.message?.imageMessage?.caption ||
-    "";
-  const ts = msg.messageTimestamp
-    ? new Date(Number(msg.messageTimestamp) * 1000)
-    : new Date();
+  const text = extractMessageText(msg);
+  const tsRaw = msg.messageTimestamp ? Number(msg.messageTimestamp) : Date.now() / 1000;
+  const ts = new Date(tsRaw * (tsRaw > 1e12 ? 1 : 1000));
   return {
-    from_me: Boolean(msg.key.fromMe),
+    id: msg.key?.id || "",
+    from_me: Boolean(msg.key?.fromMe),
     text,
     time: ts.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
     timestamp: ts.getTime(),
+    type: msg.message ? Object.keys(msg.message)[0] || "text" : "text",
   };
+}
+
+function sortMessages(messages) {
+  return [...messages].sort((a, b) => a.timestamp - b.timestamp);
+}
+
+function appendMessage(msg) {
+  const jid = msg.key?.remoteJid;
+  if (!jid || jid.includes("@broadcast")) return null;
+
+  const parsed = parseMessage(msg);
+  if (!parsed.text) return null;
+
+  const bucket = messageStore.get(jid) || [];
+  if (parsed.id && bucket.some((item) => item.id === parsed.id)) {
+    return null;
+  }
+
+  bucket.push(parsed);
+  messageStore.set(jid, sortMessages(bucket).slice(-MAX_MESSAGES_PER_CHAT));
+
+  if (parsed.id) {
+    const keys = messageKeys.get(jid) || [];
+    keys.push({ remoteJid: jid, id: parsed.id, fromMe: parsed.from_me });
+    messageKeys.set(jid, keys.slice(-MAX_MESSAGES_PER_CHAT));
+  }
+
+  const chat = chatStore.get(jid) || { id: jid };
+  chatStore.set(jid, {
+    ...chat,
+    conversation: parsed.text,
+    conversationTimestamp: parsed.timestamp,
+  });
+  return parsed;
 }
 
 function formatChat(chat) {
@@ -68,10 +118,16 @@ function formatChat(chat) {
     phone: formatPhone(chat.id),
     last_message: last,
     unread: chat.unreadCount || 0,
+    timestamp: chat.conversationTimestamp || 0,
   };
 }
 
 function bindEvents(socket) {
+  socket.ev.on("messaging-history.set", ({ chats, messages }) => {
+    for (const chat of chats || []) chatStore.set(chat.id, chat);
+    for (const msg of messages || []) appendMessage(msg);
+  });
+
   socket.ev.on("chats.set", ({ chats }) => {
     for (const chat of chats) chatStore.set(chat.id, chat);
   });
@@ -87,16 +143,9 @@ function bindEvents(socket) {
     }
   });
 
-  socket.ev.on("messages.upsert", ({ messages }) => {
-    for (const msg of messages) {
-      const jid = msg.key.remoteJid;
-      if (!jid || jid.includes("@broadcast")) continue;
-      const parsed = parseMessage(msg);
-      const bucket = messageStore.get(jid) || [];
-      bucket.push(parsed);
-      messageStore.set(jid, bucket.slice(-200));
-      const chat = chatStore.get(jid) || { id: jid };
-      chatStore.set(jid, { ...chat, conversation: parsed.text, conversationTimestamp: parsed.timestamp });
+  socket.ev.on("messages.upsert", ({ messages, type }) => {
+    for (const msg of messages || []) {
+      appendMessage(msg);
     }
   });
 }
@@ -119,6 +168,7 @@ async function connectWhatsApp() {
     auth: state,
     logger: pino({ level: "silent" }),
     printQRInTerminal: false,
+    syncFullHistory: false,
   });
 
   sock.ev.on("creds.update", saveCreds);
@@ -149,6 +199,7 @@ async function connectWhatsApp() {
       starting = false;
       chatStore.clear();
       messageStore.clear();
+      messageKeys.clear();
       if (!loggedOut) {
         setTimeout(connectWhatsApp, 2500);
       }
@@ -183,7 +234,7 @@ app.get("/chats", (_req, res) => {
   const chats = Array.from(chatStore.values())
     .filter((chat) => chat.id && !chat.id.includes("@broadcast"))
     .sort((a, b) => (b.conversationTimestamp || 0) - (a.conversationTimestamp || 0))
-    .slice(0, 80)
+    .slice(0, 100)
     .map(formatChat);
   res.json({ chats });
 });
@@ -193,7 +244,7 @@ app.get("/messages", (req, res) => {
   if (!chatId || status !== "CONNECTED") {
     return res.json({ messages: [] });
   }
-  const messages = (messageStore.get(chatId) || []).sort((a, b) => a.timestamp - b.timestamp);
+  const messages = sortMessages(messageStore.get(chatId) || []);
   res.json({ messages });
 });
 
@@ -208,18 +259,33 @@ app.post("/send", async (req, res) => {
       return res.status(503).json({ ok: false, error: "WhatsApp desconectado" });
     }
     const jid = jidFromTarget(chatId || to);
-    await sock.sendMessage(jid, { text });
-    const now = new Date();
-    const parsed = {
-      from_me: true,
-      text,
-      time: now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-      timestamp: now.getTime(),
-    };
-    const bucket = messageStore.get(jid) || [];
-    bucket.push(parsed);
-    messageStore.set(jid, bucket.slice(-200));
+    const sent = await sock.sendMessage(jid, { text });
+    appendMessage({
+      key: { remoteJid: jid, fromMe: true, id: sent?.key?.id || `local-${Date.now()}` },
+      message: { conversation: text },
+      messageTimestamp: Math.floor(Date.now() / 1000),
+    });
     res.json({ ok: true, chat_id: jid });
+  } catch (error) {
+    res.status(500).json({ ok: false, error: String(error.message || error) });
+  }
+});
+
+app.post("/read", async (req, res) => {
+  try {
+    const chatId = req.body?.chat_id;
+    if (!chatId || !sock || status !== "CONNECTED") {
+      return res.status(400).json({ ok: false, error: "Chat inválido ou desconectado" });
+    }
+    const keys = (messageKeys.get(chatId) || []).filter((item) => !item.fromMe).slice(-5);
+    if (keys.length) {
+      await sock.readMessages(keys);
+    }
+    const chat = chatStore.get(chatId);
+    if (chat) {
+      chatStore.set(chatId, { ...chat, unreadCount: 0 });
+    }
+    res.json({ ok: true });
   } catch (error) {
     res.status(500).json({ ok: false, error: String(error.message || error) });
   }
@@ -240,6 +306,7 @@ app.post("/logout", async (_req, res) => {
     connectedPhone = "";
     chatStore.clear();
     messageStore.clear();
+    messageKeys.clear();
     if (fs.existsSync(AUTH_DIR)) {
       fs.rmSync(AUTH_DIR, { recursive: true, force: true });
     }

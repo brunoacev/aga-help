@@ -149,6 +149,9 @@ class WhatsAppBridgeClient:
     def send_message(self, chat_id: str, message: str) -> dict:
         return self._post("/send", {"chat_id": chat_id, "message": message})
 
+    def mark_read(self, chat_id: str) -> dict:
+        return self._post("/read", {"chat_id": chat_id})
+
     def logout(self) -> dict:
         return self._post("/logout")
 

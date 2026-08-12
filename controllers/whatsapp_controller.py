@@ -36,6 +36,8 @@ class WhatsAppMessage:
     from_me: bool
     text: str
     time: str
+    timestamp: int = 0
+    msg_type: str = "text"
 
 
 class WhatsAppController:
@@ -125,9 +127,20 @@ class WhatsAppController:
                     from_me=bool(row.get("from_me")),
                     text=str(row.get("text") or ""),
                     time=str(row.get("time") or ""),
+                    timestamp=int(row.get("timestamp") or 0),
+                    msg_type=str(row.get("type") or "text"),
                 )
             )
+        messages.sort(key=lambda item: item.timestamp)
         return messages
+
+    def mark_conversation_read(self, conversation_id: str) -> None:
+        if not conversation_id:
+            return
+        try:
+            self.client.mark_read(conversation_id)
+        except requests.RequestException:
+            pass
 
     def send_message(self, conversation_id: str, message: str) -> tuple[bool, str]:
         clean = (message or "").strip()
