@@ -25,6 +25,7 @@ class KanbanColumn(ft.Container):
         on_details_callback,
         *,
         on_complete_callback=None,
+        on_history_callback=None,
         is_master: bool = False,
         expand: bool | int = False,
     ):
@@ -77,6 +78,7 @@ class KanbanColumn(ft.Container):
                     on_delete_callback,
                     on_details_callback,
                     on_complete_callback=on_complete_callback,
+                    on_history_callback=on_history_callback,
                     is_master=is_master,
                 )
             if completed:
@@ -91,6 +93,7 @@ class KanbanColumn(ft.Container):
                     on_delete_callback,
                     on_details_callback,
                     on_complete_callback=on_complete_callback,
+                    on_history_callback=on_history_callback,
                     is_master=is_master,
                 )
             if not pending and not completed:
@@ -104,6 +107,7 @@ class KanbanColumn(ft.Container):
                     on_move_callback,
                     on_delete_callback,
                     on_details_callback,
+                    on_history_callback=on_history_callback,
                     is_master=is_master,
                 )
             else:
@@ -164,6 +168,7 @@ class KanbanColumn(ft.Container):
         on_details_callback,
         *,
         on_complete_callback=None,
+        on_history_callback=None,
         is_master: bool = False,
     ) -> None:
         for order in orders:
@@ -176,6 +181,7 @@ class KanbanColumn(ft.Container):
                         on_delete_callback=on_delete_callback,
                         on_details_callback=on_details_callback,
                         on_complete_callback=on_complete_callback,
+                        on_history_callback=on_history_callback,
                         is_master=is_master,
                     ),
                     padding=make_padding_symmetric(horizontal=S2),

@@ -13,6 +13,8 @@ from core import colors
 from core.services.order_service import complete_order_billing, delete_order, get_orders, update_order_status
 from components.kanban_column import KanbanColumn
 from components.order_details_dialog import show_order_items_dialog
+from components.order_history_dialog import show_order_history_dialog
+from core.auth.user_session import get_user_handle
 from utils.flet_compat import confirm_dialog, show_snackbar
 from utils.ui_theme import S4, page_container, page_header
 
@@ -65,6 +67,7 @@ class KanbanView(ft.Container):
                     on_delete_callback=self._confirm_delete,
                     on_details_callback=self._show_order_details,
                     on_complete_callback=self._complete_billing,
+                    on_history_callback=self._show_order_history,
                     is_master=self.is_master,
                     expand=True,
                 )
@@ -97,7 +100,9 @@ class KanbanView(ft.Container):
                 success=False,
             )
             return
-        update_order_status(order_id, new_stage)
+        old_status = order.get("status") if order else ""
+        handle = get_user_handle(self.app_page)
+        update_order_status(order_id, new_stage, user_handle=handle, old_status=old_status or "")
         self.refresh()
         self._notify_orders_changed()
 
@@ -105,7 +110,8 @@ class KanbanView(ft.Container):
         order = self._find_order(order_id)
         if not order:
             return
-        complete_order_billing(order_id)
+        handle = get_user_handle(self.app_page)
+        complete_order_billing(order_id, user_handle=handle)
         self.refresh()
         self._notify_orders_changed()
         show_snackbar(self.app_page, "Faturamento concluído com sucesso!", success=True)
@@ -119,6 +125,9 @@ class KanbanView(ft.Container):
             )
             return
         show_order_items_dialog(self.app_page, order)
+
+    def _show_order_history(self, order: dict) -> None:
+        show_order_history_dialog(self.app_page, order)
 
     def _confirm_delete(self, order_id: int) -> None:
         order = self._find_order(order_id)

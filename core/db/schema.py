@@ -68,5 +68,32 @@ def init_db() -> None:
             conn.execute("ALTER TABLE orders ADD COLUMN is_billed INTEGER NOT NULL DEFAULT 0")
         except sqlite3.OperationalError:
             pass
+        try:
+            conn.execute("ALTER TABLE orders ADD COLUMN created_by TEXT DEFAULT ''")
+        except sqlite3.OperationalError:
+            pass
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS app_users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                handle TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS order_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                order_id INTEGER NOT NULL,
+                user_handle TEXT NOT NULL,
+                action_description TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                synced INTEGER NOT NULL DEFAULT 0
+            )
+            """
+        )
         backfill_order_timestamps()
         conn.commit()

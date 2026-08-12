@@ -5,6 +5,7 @@ from __future__ import annotations
 import flet as ft
 
 from controllers.order_form_controller import OrderFormController
+from core.auth.user_session import get_user_handle
 from core import colors
 from components.order_form.components_picker import ComponentsPicker
 from components.order_form.order_spec_section import OrderSpecSection
@@ -101,7 +102,8 @@ class QuickOrderBar(ft.Container):
             safe_update(self)
             return
 
-        success, persist_error = self.controller.save(form_data)
+        created_by = get_user_handle(self.app_page)
+        success, persist_error = self.controller.save(form_data, created_by=created_by)
         if not success:
             self.lbl_error.value = persist_error
             self.lbl_error.visible = True

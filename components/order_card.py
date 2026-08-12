@@ -25,6 +25,7 @@ class OrderCard(ft.Container):
         on_details_callback,
         *,
         on_complete_callback=None,
+        on_history_callback=None,
         is_master: bool = False,
     ):
         order_id = order["id"]
@@ -50,30 +51,48 @@ class OrderCard(ft.Container):
             style=ft.TextStyle(decoration=ft.TextDecoration.LINE_THROUGH) if billed else None,
         )
 
+        created_by = (order.get("created_by") or "").strip()
+        header_lines: list[ft.Control] = [
+            ft.Row(
+                [
+                    order_title,
+                    ft.Text(
+                        order_date_label,
+                        size=FONT_CAPTION,
+                        color=colors.TEXT_MUTED,
+                    ),
+                    ft.Container(expand=True),
+                    ft.Text(
+                        reseller_name,
+                        size=FONT_BODY,
+                        color=colors.PRIMARY,
+                        weight=ft.FontWeight.W_500,
+                        overflow=ft.TextOverflow.ELLIPSIS,
+                        text_align=ft.TextAlign.RIGHT,
+                    ),
+                ],
+                alignment=ft.MainAxisAlignment.START,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+        ]
+        if created_by:
+            header_lines.append(
+                ft.Container(
+                    content=ft.Text(
+                        f"👤 {created_by}",
+                        size=10,
+                        color=colors.PRIMARY,
+                        weight=ft.FontWeight.W_600,
+                    ),
+                    bgcolor=colors.BG_SURFACE,
+                    border=border_all(colors.PRIMARY),
+                    border_radius=RADIUS,
+                    padding=make_padding_symmetric(horizontal=8, vertical=4),
+                )
+            )
+
         card_header = ft.Column(
-            [
-                ft.Row(
-                    [
-                        order_title,
-                        ft.Text(
-                            order_date_label,
-                            size=FONT_CAPTION,
-                            color=colors.TEXT_MUTED,
-                        ),
-                        ft.Container(expand=True),
-                        ft.Text(
-                            reseller_name,
-                            size=FONT_BODY,
-                            color=colors.PRIMARY,
-                            weight=ft.FontWeight.W_500,
-                            overflow=ft.TextOverflow.ELLIPSIS,
-                            text_align=ft.TextAlign.RIGHT,
-                        ),
-                    ],
-                    alignment=ft.MainAxisAlignment.START,
-                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                ),
-            ],
+            header_lines,
             spacing=S2 // 4,
             tight=True,
         )
@@ -197,6 +216,14 @@ class OrderCard(ft.Container):
             on_click=lambda _: on_details_callback(order),
             disabled=locked,
         )
+        btn_history = icon_button(
+            "HISTORY",
+            "history",
+            color=colors.TEXT_SECONDARY,
+            tooltip="Histórico de Ações",
+            on_click=lambda _: on_history_callback(order) if on_history_callback else None,
+            disabled=on_history_callback is None,
+        )
         btn_delete = icon_button(
             "DELETE_OUTLINE",
             "delete",
@@ -206,7 +233,7 @@ class OrderCard(ft.Container):
             disabled=locked,
         )
 
-        left_actions = [btn_details, *action_buttons]
+        left_actions = [btn_details, btn_history, *action_buttons]
         if billing_action is not None:
             left_actions.append(billing_action)
 

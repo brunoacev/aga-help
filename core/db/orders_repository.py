@@ -26,18 +26,19 @@ def add_order(
     items_json: str = "[]",
     service_type: str = "componentes",
     created_at: str | None = None,
-) -> None:
-    """Insere um novo pedido."""
+    created_by: str = "",
+) -> int:
+    """Insere um novo pedido e retorna o id."""
     target_address = sanitize_text(address) or AGATEK_ADDRESS
     timestamp = (created_at or "").strip() or current_order_timestamp()
     with get_connection() as conn:
-        conn.execute(
+        cursor = conn.execute(
             """
             INSERT INTO orders (
                 order_number, reseller_name, phone, address, value,
                 entry_date, deadline_date, description, width, height,
-                status, created_at, items_json, service_type
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                status, created_at, items_json, service_type, created_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 sanitize_text(order_number, max_length=30),
@@ -54,10 +55,13 @@ def add_order(
                 timestamp,
                 sanitize_text(items_json),
                 sanitize_text(service_type, max_length=30),
+                sanitize_text(created_by, max_length=40),
             ),
         )
         conn.commit()
+        order_id = int(cursor.lastrowid or 0)
     add_log("NOVO PEDIDO", f"Pedido #{order_number} criado para {reseller_name}.")
+    return order_id
 
 
 def get_orders() -> list[dict]:

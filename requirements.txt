@@ -1,4 +1,6 @@
 flet==0.86.5
 qrcode[pil]>=7.4.2
 requests>=2.32.0
+supabase>=2.0.0
+python-dotenv>=1.0.0
 pytest>=8.0.0

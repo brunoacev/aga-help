@@ -135,7 +135,7 @@ class OrderFormController:
 
         return True, "", set()
 
-    def save(self, form_data: dict) -> tuple[bool, str]:
+    def save(self, form_data: dict, *, created_by: str = "") -> tuple[bool, str]:
         """Valida e persiste pedido."""
         backfill_order_timestamps()
         valid, error, _ = self.validate(form_data)
@@ -158,7 +158,7 @@ class OrderFormController:
         else:
             form_data["items"] = []
 
-        success, persist_error = create_order(form_data)
+        success, persist_error = create_order(form_data, created_by=created_by)
         if success:
             self.reset()
         return success, persist_error

@@ -6,6 +6,7 @@ from datetime import datetime
 
 from core.db import orders_repository
 from core.db.logs_repository import add_log
+from core.services.order_history_service import record_order_action
 from utils.dates import add_business_days
 from utils.formatting import parse_brl
 from utils.order_items import serialize_order_items
@@ -34,7 +35,7 @@ def validate_order_form(form_data: dict) -> tuple[bool, list[str]]:
     return len(missing) == 0, missing
 
 
-def create_order(form_data: dict) -> tuple[bool, str]:
+def create_order(form_data: dict, *, created_by: str = "") -> tuple[bool, str]:
     """
     Cria pedido a partir dos dados do formulário.
     Retorna (sucesso, mensagem_erro).
@@ -55,7 +56,7 @@ def create_order(form_data: dict) -> tuple[bool, str]:
     deadline_str = deadline_dt.strftime("%d/%m/%Y")
     value = parse_brl(form_data.get("value", "0"))
 
-    orders_repository.add_order(
+    order_id = orders_repository.add_order(
         order_number=sanitize_text(form_data["order_number"], max_length=30),
         reseller_name=sanitize_name(form_data["reseller_name"]),
         phone=form_data.get("phone", ""),
@@ -70,7 +71,10 @@ def create_order(form_data: dict) -> tuple[bool, str]:
         items_json=serialize_order_items(form_data.get("items") or []),
         service_type=sanitize_text(form_data.get("service_type", SERVICE_PARTS), max_length=30),
         created_at=created_at,
+        created_by=sanitize_text(created_by, max_length=40),
     )
+    handle = (created_by or "@sistema").strip()
+    record_order_action(order_id, handle, f"{handle} criou este orçamento")
     return True, ""
 
 
@@ -79,15 +83,24 @@ def get_orders() -> list[dict]:
     return orders_repository.get_orders()
 
 
-def update_order_status(order_id: int, new_status: str) -> None:
+def update_order_status(order_id: int, new_status: str, *, user_handle: str = "", old_status: str = "") -> None:
     """Atualiza status do pedido."""
     orders_repository.update_order_status(order_id, new_status)
     add_log("STATUS", f"Pedido #{order_id} movido para {new_status}.")
+    handle = (user_handle or "@sistema").strip()
+    if old_status and old_status != new_status:
+        record_order_action(
+            order_id,
+            handle,
+            f"{handle} moveu de '{old_status}' para '{new_status}'",
+        )
 
 
-def complete_order_billing(order_id: int) -> None:
+def complete_order_billing(order_id: int, *, user_handle: str = "") -> None:
     """Confirma conclusão do faturamento na coluna Faturado."""
     orders_repository.mark_order_billed(order_id, is_billed=True)
+    handle = (user_handle or "@sistema").strip()
+    record_order_action(order_id, handle, f"{handle} marcou como Faturado/Concluído")
 
 
 def delete_order(order_id: int) -> None:
