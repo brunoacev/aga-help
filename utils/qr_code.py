@@ -18,3 +18,8 @@ def generate_qr_base64(qr_data_string: str) -> str:
     buffer = io.BytesIO()
     image.save(buffer, format="PNG")
     return base64.b64encode(buffer.getvalue()).decode("ascii")
+
+
+def qr_data_uri(qr_data_string: str) -> str:
+    """Retorna data URI pronto para `ft.Image(src=...)`."""
+    return f"data:image/png;base64,{generate_qr_base64(qr_data_string)}"

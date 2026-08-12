@@ -47,7 +47,7 @@ class OrderCard(ft.Container):
             weight=ft.FontWeight.W_600,
             size=FONT_LABEL,
             color=colors.TEXT_PRIMARY,
-            decoration=ft.TextDecoration.LINE_THROUGH if billed else None,
+            style=ft.TextStyle(decoration=ft.TextDecoration.LINE_THROUGH) if billed else None,
         )
 
         card_header = ft.Column(

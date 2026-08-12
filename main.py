@@ -95,6 +95,8 @@ def main(page: ft.Page) -> None:
         page.update()
         if view_name == "commissions":
             commissions_view.refresh()
+        if view_name == "whatsapp":
+            whatsapp_view.on_show()
 
     def on_clear_database():
         confirm_dialog(

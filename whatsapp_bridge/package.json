@@ -1,0 +1,15 @@
+{
+  "name": "aga-help-whatsapp-bridge",
+  "version": "1.0.0",
+  "description": "Ponte local WhatsApp (Baileys) para o AGA HELP",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.18",
+    "express": "^4.21.2",
+    "pino": "^9.6.0"
+  }
+}

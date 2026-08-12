@@ -6,6 +6,7 @@ requires-python = ">=3.10"
 dependencies = [
     "flet==0.86.5",
     "qrcode[pil]>=7.4.2",
+    "requests>=2.32.0",
 ]
 
 [project.optional-dependencies]

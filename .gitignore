@@ -13,3 +13,5 @@ project_code_dump.txt
 .mypy_cache/
 htmlcov/
 .coverage
+whatsapp_bridge/node_modules/
+whatsapp_bridge/auth_info/
