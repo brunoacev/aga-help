@@ -1,138 +1,122 @@
-import flet as ft
-from core import colors
+"""Barra lateral de navegação."""
 
-def make_padding_symmetric(horizontal=0, vertical=0):
-    if hasattr(ft, "Padding"):
-        return ft.Padding(horizontal, vertical, horizontal, vertical)
-    if hasattr(ft, "padding") and hasattr(ft.padding, "symmetric"):
-        return ft.padding.symmetric(horizontal=horizontal, vertical=vertical)
-    return ft.padding.only(left=horizontal, right=horizontal, top=vertical, bottom=vertical)
+from __future__ import annotations
+
+import flet as ft
+
+from core import colors
+from utils.flet_compat import make_padding_symmetric, safe_update
+from utils.ui_theme import S2, S3, S4, SIDEBAR_COLLAPSED, SIDEBAR_EXPANDED, nav_item
+
 
 class Sidebar(ft.Container):
+    """Menu lateral com navegação entre módulos."""
+
     def __init__(self, on_navigate, on_clear_click):
         self.on_navigate = on_navigate
         self.on_clear_click = on_clear_click
         self.active_view = "kanban"
 
-        border_right = ft.Border(right=ft.BorderSide(1, colors.BORDER_COLOR)) if hasattr(ft, "Border") else None
+        if hasattr(ft, "Border"):
+            border_right = ft.Border(right=ft.BorderSide(1, colors.BORDER_COLOR))
+        else:
+            border_right = None
 
-        self.txt_title = ft.Text("Aga-Help", weight=ft.FontWeight.BOLD, size=14, color=colors.TEXT_PRIMARY, visible=False)
-
-        # Módulo 1: Kanban
-        self.txt_kanban = ft.Text("1. Quadro Kanban", size=12, color=colors.TEXT_PRIMARY, visible=False, weight=ft.FontWeight.W_500)
-        self.btn_kanban = ft.Container(
-            content=ft.Row([
-                ft.Icon(getattr(ft.Icons, "DASHBOARD_ROUNDED", None) or "dashboard", color=colors.PRIMARY, size=20),
-                self.txt_kanban
-            ], spacing=12),
-            padding=make_padding_symmetric(horizontal=12, vertical=10),
-            border_radius=8,
-            bgcolor=colors.BG_SURFACE_LIGHT,
-            on_click=lambda _: self.on_navigate("kanban")
+        self.txt_title = ft.Text(
+            "Aga-Help",
+            weight=ft.FontWeight.W_600,
+            size=14,
+            color=colors.TEXT_PRIMARY,
+            visible=False,
         )
 
-        # Módulo 2: Cadastro de Pedido
-        self.txt_add = ft.Text("2. Cadastro Pedido", size=12, color=colors.TEXT_PRIMARY, visible=False, weight=ft.FontWeight.W_500)
-        self.btn_add = ft.Container(
-            content=ft.Row([
-                ft.Icon(getattr(ft.Icons, "ADD_BOX_ROUNDED", None) or "add", color=colors.TEXT_SECONDARY, size=20),
-                self.txt_add
-            ], spacing=12),
-            padding=make_padding_symmetric(horizontal=12, vertical=10),
-            border_radius=8,
-            bgcolor="transparent",
-            on_click=lambda _: self.on_navigate("add")
-        )
+        nav_items = [
+            ("kanban", "Quadro Kanban", "DASHBOARD_ROUNDED", "dashboard"),
+            ("add", "Cadastro Pedido", "ADD_BOX_ROUNDED", "add"),
+            ("agenda", "Ações Agenda", "CONTACTS_ROUNDED", "contacts"),
+            ("materials", "Materiais", "INVENTORY_2_ROUNDED", "inventory"),
+            ("logs", "Auditoria", "HISTORY_ROUNDED", "history"),
+        ]
 
-        # Módulo 3: Agenda & Histórico
-        self.txt_contacts = ft.Text("3. Ações Agenda", size=12, color=colors.TEXT_PRIMARY, visible=False, weight=ft.FontWeight.W_500)
-        self.btn_contacts = ft.Container(
-            content=ft.Row([
-                ft.Icon(getattr(ft.Icons, "CONTACTS_ROUNDED", None) or "contacts", color=colors.TEXT_SECONDARY, size=20),
-                self.txt_contacts
-            ], spacing=12),
-            padding=make_padding_symmetric(horizontal=12, vertical=10),
-            border_radius=8,
-            bgcolor="transparent",
-            on_click=lambda _: self.on_navigate("agenda")
-        )
+        self.nav_buttons: dict[str, ft.Container] = {}
+        self.nav_texts: dict[str, ft.Text] = {}
+        nav_controls = []
 
-        # Módulo 4: Materiais e Componentes (NOVO)
-        self.txt_materials = ft.Text("4. Materiais", size=12, color=colors.TEXT_PRIMARY, visible=False, weight=ft.FontWeight.W_500)
-        self.btn_materials = ft.Container(
-            content=ft.Row([
-                ft.Icon(getattr(ft.Icons, "INVENTORY_2_ROUNDED", None) or "inventory", color=colors.TEXT_SECONDARY, size=20),
-                self.txt_materials
-            ], spacing=12),
-            padding=make_padding_symmetric(horizontal=12, vertical=10),
-            border_radius=8,
-            bgcolor="transparent",
-            on_click=lambda _: self.on_navigate("materials")
-        )
+        for view_id, label, icon_name, fallback in nav_items:
+            txt = ft.Text(
+                label,
+                size=12,
+                color=colors.TEXT_PRIMARY,
+                visible=False,
+                weight=ft.FontWeight.W_500,
+            )
+            btn = nav_item(
+                icon_name,
+                fallback,
+                txt,
+                lambda _, v=view_id: self.on_navigate(v),
+                active=view_id == "kanban",
+            )
+            self.nav_buttons[view_id] = btn
+            self.nav_texts[view_id] = txt
+            nav_controls.append(btn)
 
-        # Botão Limpar Banco (Rodapé)
-        self.txt_clear = ft.Text("Limpar Banco", size=12, color="#F85149", visible=False, weight=ft.FontWeight.W_500)
-        self.btn_clear = ft.Container(
-            content=ft.Row([
-                ft.Icon(getattr(ft.Icons, "DELETE_SWEEP_ROUNDED", None) or "delete_sweep", color="#F85149", size=20),
-                self.txt_clear
-            ], spacing=12),
-            padding=make_padding_symmetric(horizontal=12, vertical=10),
-            border_radius=8,
-            bgcolor="transparent",
-            on_click=lambda _: self.on_clear_click()
+        self.txt_clear = ft.Text(
+            "Limpar Banco",
+            size=12,
+            color=colors.ERROR,
+            visible=False,
+            weight=ft.FontWeight.W_500,
         )
+        self.btn_clear = nav_item(
+            "DELETE_SWEEP_ROUNDED",
+            "delete_sweep",
+            self.txt_clear,
+            lambda _: self.on_clear_click(),
+        )
+        self.btn_clear.content.controls[0].color = colors.ERROR
 
         super().__init__(
-            width=64,
+            width=SIDEBAR_COLLAPSED,
             bgcolor=colors.BG_SURFACE,
             border=border_right,
-            padding=make_padding_symmetric(horizontal=8, vertical=16),
+            padding=make_padding_symmetric(horizontal=S2, vertical=S4),
             animate=ft.Animation(200, ft.AnimationCurve.EASE_IN_OUT) if hasattr(ft, "Animation") else None,
             on_hover=self._handle_hover,
-            content=ft.Column([
-                ft.Row([
-                    ft.Icon(getattr(ft.Icons, "VIEW_KANBAN_ROUNDED", None) or "view_kanban", color=colors.PRIMARY, size=22),
-                    self.txt_title
-                ], spacing=12),
-                
-                ft.Divider(color=colors.BORDER_COLOR, height=16),
-                
-                ft.Column([
-                    self.btn_kanban,
-                    self.btn_add,
-                    self.btn_contacts,
-                    self.btn_materials
-                ], spacing=6, expand=True),
-
-                self.btn_clear
-            ], spacing=10)
+            content=ft.Column(
+                [
+                    ft.Row(
+                        [
+                            ft.Icon(
+                                getattr(ft.Icons, "VIEW_KANBAN_ROUNDED", None) or "view_kanban",
+                                color=colors.PRIMARY,
+                                size=24,
+                            ),
+                            self.txt_title,
+                        ],
+                        spacing=S3,
+                    ),
+                    ft.Divider(color=colors.BORDER_COLOR, height=S4),
+                    ft.Column(nav_controls, spacing=S2, expand=True),
+                    self.btn_clear,
+                ],
+                spacing=S3,
+            ),
         )
 
-    def set_active(self, view_name: str):
+    def set_active(self, view_name: str) -> None:
         self.active_view = view_name
-        
-        self.btn_kanban.bgcolor = colors.BG_SURFACE_LIGHT if view_name == "kanban" else "transparent"
-        self.btn_add.bgcolor = colors.BG_SURFACE_LIGHT if view_name == "add" else "transparent"
-        self.btn_contacts.bgcolor = colors.BG_SURFACE_LIGHT if view_name == "agenda" else "transparent"
-        self.btn_materials.bgcolor = colors.BG_SURFACE_LIGHT if view_name == "materials" else "transparent"
-        
-        self.btn_kanban.content.controls[0].color = colors.PRIMARY if view_name == "kanban" else colors.TEXT_SECONDARY
-        self.btn_add.content.controls[0].color = colors.PRIMARY if view_name == "add" else colors.TEXT_SECONDARY
-        self.btn_contacts.content.controls[0].color = colors.PRIMARY if view_name == "agenda" else colors.TEXT_SECONDARY
-        self.btn_materials.content.controls[0].color = colors.PRIMARY if view_name == "materials" else colors.TEXT_SECONDARY
-        
-        self.update()
+        for view_id, btn in self.nav_buttons.items():
+            is_active = view_id == view_name
+            btn.bgcolor = colors.BG_SURFACE_LIGHT if is_active else "transparent"
+            btn.content.controls[0].color = colors.PRIMARY if is_active else colors.TEXT_SECONDARY
+        safe_update(self)
 
-    def _handle_hover(self, e):
+    def _handle_hover(self, e) -> None:
         is_hovered = e.data == "true"
-        self.width = 180 if is_hovered else 64
-
+        self.width = SIDEBAR_EXPANDED if is_hovered else SIDEBAR_COLLAPSED
         self.txt_title.visible = is_hovered
-        self.txt_kanban.visible = is_hovered
-        self.txt_add.visible = is_hovered
-        self.txt_contacts.visible = is_hovered
-        self.txt_materials.visible = is_hovered
+        for txt in self.nav_texts.values():
+            txt.visible = is_hovered
         self.txt_clear.visible = is_hovered
-
-        self.update()
+        safe_update(self)

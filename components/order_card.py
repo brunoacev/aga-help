@@ -1,20 +1,19 @@
-import flet as ft
-from core import colors
+"""Card de pedido no Kanban."""
 
-def make_padding_symmetric(horizontal=0, vertical=0):
-    if hasattr(ft, "Padding"):
-        return ft.Padding(horizontal, vertical, horizontal, vertical)
-    if hasattr(ft, "padding") and hasattr(ft.padding, "symmetric"):
-        return ft.padding.symmetric(horizontal=horizontal, vertical=vertical)
-    return ft.padding.only(left=horizontal, right=horizontal, top=vertical, bottom=vertical)
+from __future__ import annotations
+
+import flet as ft
+
+from core import colors
+from utils.formatting import format_brl
+from utils.flet_compat import border_all, make_padding_symmetric, safe_update
+from utils.ui_theme import FONT_BODY, FONT_CAPTION, FONT_LABEL, ORDER_CARD_WIDTH, RADIUS, S2, S3, icon_button
+
 
 class OrderCard(ft.Container):
-    def __init__(self, order, stages, on_move_callback, on_delete_callback):
-        self.order = order
-        self.stages = stages
-        self.on_move_callback = on_move_callback
-        self.on_delete_callback = on_delete_callback
+    """Representa um pedido na coluna Kanban."""
 
+    def __init__(self, order, stages, on_move_callback, on_delete_callback):
         order_id = order["id"]
         order_number = order.get("order_number", f"#{order_id}")
         reseller_name = order.get("reseller_name", "Revenda Desconhecida")
@@ -24,104 +23,143 @@ class OrderCard(ft.Container):
         width = order.get("width", "")
         height = order.get("height", "")
         current_status = order.get("status", "Orçamento")
-        
+
         value = float(order.get("value", 0.0))
         commission = value * 0.02
+        formatted_value = format_brl(value)
+        formatted_commission = format_brl(commission)
 
-        formatted_value = f"R$ {value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-        formatted_commission = f"R$ {commission:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-
-        # Cabeçalho do Card
-        card_header = ft.Row([
-            ft.Text(f"Pedido #{order_number}", weight=ft.FontWeight.BOLD, size=12, color=colors.TEXT_PRIMARY),
-            ft.Text(reseller_name, size=11, color=colors.PRIMARY, weight=ft.FontWeight.W_500, overflow=ft.TextOverflow.ELLIPSIS)
-        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
-
-        # Informações de Contato e Endereço Fixo
-        contact_info = []
-        if phone:
-            contact_info.append(ft.Text(f"📞 {phone}", size=10, color=colors.TEXT_SECONDARY))
-        contact_info.append(ft.Text(f"📍 {address}", size=10, color=colors.TEXT_MUTED, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS))
-
-        # Medidas e Descrição
-        dimensions_text = f" 📐 {width or '?'}m x {height or '?'}m" if (width or height) else ""
-        desc_text = ft.Text(f"{description}{dimensions_text}", size=10, color=colors.TEXT_SECONDARY, max_lines=2, overflow=ft.TextOverflow.ELLIPSIS)
-
-        # Bloco Financeiro
-        financial_box = ft.Container(
-            content=ft.Row([
-                ft.Column([
-                    ft.Text("VALOR TOTAL", size=8, color=colors.TEXT_MUTED, weight=ft.FontWeight.BOLD),
-                    ft.Text(formatted_value, size=11, weight=ft.FontWeight.BOLD, color=colors.TEXT_PRIMARY),
-                ], spacing=1),
-                ft.Column([
-                    ft.Text("COMISSÃO (2%)", size=8, color=colors.PRIMARY, weight=ft.FontWeight.BOLD),
-                    ft.Text(formatted_commission, size=11, weight=ft.FontWeight.BOLD, color=colors.PRIMARY),
-                ], spacing=1, alignment=ft.MainAxisAlignment.END)
-            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-            bgcolor=colors.BG_SURFACE_LIGHT,
-            padding=make_padding_symmetric(horizontal=8, vertical=4),
-            border_radius=6
+        card_header = ft.Row(
+            [
+                ft.Text(
+                    f"Pedido #{order_number}",
+                    weight=ft.FontWeight.W_600,
+                    size=FONT_LABEL,
+                    color=colors.TEXT_PRIMARY,
+                ),
+                ft.Text(
+                    reseller_name,
+                    size=FONT_BODY,
+                    color=colors.PRIMARY,
+                    weight=ft.FontWeight.W_500,
+                    overflow=ft.TextOverflow.ELLIPSIS,
+                ),
+            ],
+            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
         )
 
-        # Botões de Ação
+        contact_info = []
+        if phone:
+            contact_info.append(ft.Text(f"📞 {phone}", size=FONT_CAPTION, color=colors.TEXT_SECONDARY))
+        contact_info.append(
+            ft.Text(
+                f"📍 {address}",
+                size=FONT_CAPTION,
+                color=colors.TEXT_MUTED,
+                max_lines=1,
+                overflow=ft.TextOverflow.ELLIPSIS,
+            )
+        )
+
+        dimensions_text = f" · {width or '?'}m × {height or '?'}m" if (width or height) else ""
+        desc_text = ft.Text(
+            f"{description}{dimensions_text}",
+            size=FONT_CAPTION,
+            color=colors.TEXT_SECONDARY,
+            max_lines=2,
+            overflow=ft.TextOverflow.ELLIPSIS,
+        )
+
+        financial_box = ft.Container(
+            content=ft.Row(
+                [
+                    ft.Column(
+                        [
+                            ft.Text("VALOR TOTAL", size=10, color=colors.TEXT_MUTED, weight=ft.FontWeight.W_600),
+                            ft.Text(formatted_value, size=FONT_BODY, weight=ft.FontWeight.W_600, color=colors.TEXT_PRIMARY),
+                        ],
+                        spacing=S2 // 4,
+                    ),
+                    ft.Column(
+                        [
+                            ft.Text("COMISSÃO (2%)", size=10, color=colors.PRIMARY, weight=ft.FontWeight.W_600),
+                            ft.Text(formatted_commission, size=FONT_BODY, weight=ft.FontWeight.W_600, color=colors.PRIMARY),
+                        ],
+                        spacing=S2 // 4,
+                        alignment=ft.MainAxisAlignment.END,
+                    ),
+                ],
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            ),
+            bgcolor=colors.BG_SURFACE_LIGHT,
+            padding=make_padding_symmetric(horizontal=S2, vertical=S2),
+            border_radius=RADIUS,
+        )
+
         action_buttons = []
         curr_index = stages.index(current_status) if current_status in stages else 0
 
         if curr_index > 0:
             prev_stage = stages[curr_index - 1]
             action_buttons.append(
-                ft.IconButton(
-                    icon=getattr(ft.Icons, "ARROW_BACK_ROUNDED", None) or "arrow_back",
-                    icon_color=colors.TEXT_SECONDARY,
-                    icon_size=16,
-                    padding=0,
+                icon_button(
+                    "ARROW_BACK_ROUNDED",
+                    "arrow_back",
+                    color=colors.TEXT_SECONDARY,
                     tooltip=f"Voltar para {prev_stage}",
-                    on_click=lambda _: self.on_move_callback(order_id, prev_stage)
+                    on_click=lambda _: on_move_callback(order_id, prev_stage),
                 )
             )
 
         if curr_index < len(stages) - 1:
             next_stage = stages[curr_index + 1]
             action_buttons.append(
-                ft.IconButton(
-                    icon=getattr(ft.Icons, "ARROW_FORWARD_ROUNDED", None) or "arrow_forward",
-                    icon_color=colors.PRIMARY,
-                    icon_size=16,
-                    padding=0,
+                icon_button(
+                    "ARROW_FORWARD_ROUNDED",
+                    "arrow_forward",
+                    color=colors.PRIMARY,
                     tooltip=f"Avançar para {next_stage}",
-                    on_click=lambda _: self.on_move_callback(order_id, next_stage)
+                    on_click=lambda _: on_move_callback(order_id, next_stage),
                 )
             )
 
-        btn_delete = ft.IconButton(
-            icon=getattr(ft.Icons, "DELETE_OUTLINE", None) or "delete",
-            icon_color="#F85149",
-            icon_size=16,
-            padding=0,
+        btn_delete = icon_button(
+            "DELETE_OUTLINE",
+            "delete",
+            color=colors.ERROR,
             tooltip="Excluir Pedido",
-            on_click=lambda _: self.on_delete_callback(order_id)
+            on_click=lambda _: on_delete_callback(order_id),
         )
 
-        actions_row = ft.Row([
-            ft.Row(action_buttons, spacing=2),
-            btn_delete
-        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
-
-        border_card = ft.Border.all(1, colors.BORDER_COLOR) if hasattr(ft, "Border") else None
+        actions_row = ft.Row(
+            [ft.Row(action_buttons, spacing=0), btn_delete],
+            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+        )
 
         super().__init__(
-            width=260, # LARGURA FIXA PARA MANTER A UNIFORMIDADE DOS CARDS
-            bgcolor=colors.BG_SURFACE,
-            border=border_card,
-            border_radius=8,
-            padding=10,
-            content=ft.Column([
-                card_header,
-                ft.Column(contact_info, spacing=2),
-                desc_text,
-                financial_box,
-                ft.Divider(color=colors.BORDER_COLOR, height=6),
-                actions_row
-            ], spacing=6)
+            width=ORDER_CARD_WIDTH,
+            bgcolor=colors.BG_SURFACE_LIGHT,
+            border=border_all(colors.BORDER_COLOR),
+            border_radius=RADIUS,
+            padding=S3,
+            animate=ft.Animation(150, ft.AnimationCurve.EASE_OUT) if hasattr(ft, "Animation") else None,
+            on_hover=self._on_hover,
+            content=ft.Column(
+                [
+                    card_header,
+                    ft.Column(contact_info, spacing=S2 // 4),
+                    desc_text,
+                    financial_box,
+                    ft.Divider(color=colors.BORDER_COLOR, height=1),
+                    actions_row,
+                ],
+                spacing=S2,
+            ),
         )
+
+    def _on_hover(self, e):
+        self.border = border_all(
+            colors.PRIMARY if e.data == "true" else colors.BORDER_COLOR,
+        )
+        self.bgcolor = colors.BG_HOVER if e.data == "true" else colors.BG_SURFACE_LIGHT
+        safe_update(self)

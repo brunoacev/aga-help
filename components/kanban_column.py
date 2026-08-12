@@ -1,51 +1,86 @@
+"""Coluna do quadro Kanban."""
+
+from __future__ import annotations
+
 import flet as ft
+
 from core import colors
 from components.order_card import OrderCard
+from utils.flet_compat import border_all, get_alignment_center, make_padding_symmetric
+from utils.ui_theme import FONT_LABEL, KANBAN_COL_WIDTH, RADIUS, S1, S2, S3, S4, WEIGHT_LABEL
+
 
 class KanbanColumn(ft.Container):
+    """Coluna de etapa do Kanban."""
+
     def __init__(self, stage: str, orders: list, stage_color: str, stages: list, on_move_callback, on_delete_callback):
-        self.stage = stage
-        self.orders = orders
-        self.stage_color = stage_color
-        self.stages = stages
-        self.on_move_callback = on_move_callback
-        self.on_delete_callback = on_delete_callback
+        header = ft.Row(
+            [
+                ft.Row(
+                    [
+                        ft.Container(width=S2, height=S2, border_radius=S2, bgcolor=stage_color),
+                        ft.Text(
+                            stage,
+                            weight=WEIGHT_LABEL,
+                            size=FONT_LABEL,
+                            color=colors.TEXT_PRIMARY,
+                        ),
+                    ],
+                    spacing=S2,
+                ),
+                ft.Container(
+                    content=ft.Text(
+                        str(len(orders)),
+                        size=11,
+                        weight=ft.FontWeight.W_600,
+                        color=colors.TEXT_SECONDARY,
+                    ),
+                    bgcolor=colors.BG_SURFACE,
+                    padding=make_padding_symmetric(horizontal=S2, vertical=S1),
+                    border_radius=RADIUS,
+                ),
+            ],
+            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+        )
 
-        header = ft.Row([
-            ft.Row([
-                ft.Container(width=10, height=10, border_radius=5, bgcolor=stage_color),
-                ft.Text(stage, weight=ft.FontWeight.BOLD, size=12, color=colors.TEXT_PRIMARY),
-            ], spacing=6),
-            ft.Container(
-                content=ft.Text(str(len(orders)), size=10, weight=ft.FontWeight.BOLD, color=colors.TEXT_SECONDARY),
-                bgcolor=colors.BG_SURFACE_LIGHT,
-                padding=ft.Padding(6, 2, 6, 2) if hasattr(ft, "Padding") else None,
-                border_radius=8
-            )
-        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
-
-        cards_list = ft.Column(spacing=8, scroll=ft.ScrollMode.AUTO, expand=True)
-
+        cards_list = ft.Column(spacing=S3, scroll=ft.ScrollMode.AUTO, expand=True)
         for order in orders:
-            card = OrderCard(
-                order=order,
-                stages=stages,
-                on_move_callback=on_move_callback,
-                on_delete_callback=on_delete_callback
+            cards_list.controls.append(
+                OrderCard(
+                    order=order,
+                    stages=stages,
+                    on_move_callback=on_move_callback,
+                    on_delete_callback=on_delete_callback,
+                )
             )
-            cards_list.controls.append(card)
 
-        border_col = ft.Border.all(1, colors.BORDER_COLOR) if hasattr(ft, "Border") else None
+        if not orders:
+            cards_list.controls.append(
+                ft.Container(
+                    content=ft.Text(
+                        "Nenhum pedido nesta etapa",
+                        size=11,
+                        color=colors.TEXT_MUTED,
+                        text_align=ft.TextAlign.CENTER,
+                    ),
+                    padding=S4,
+                    alignment=get_alignment_center(),
+                )
+            )
 
         super().__init__(
-            width=280, # LARGURA PADRONIZADA DAS COLUNAS DO KANBAN
-            bgcolor=colors.BG_SURFACE_LIGHT,
-            border=border_col,
-            border_radius=8,
-            padding=10,
-            content=ft.Column([
-                header,
-                ft.Divider(color=colors.BORDER_COLOR, height=6),
-                cards_list
-            ], spacing=6, expand=True)
+            width=KANBAN_COL_WIDTH,
+            bgcolor=colors.BG_SURFACE,
+            border=border_all(colors.BORDER_COLOR),
+            border_radius=RADIUS,
+            padding=S4,
+            content=ft.Column(
+                [
+                    header,
+                    ft.Divider(color=colors.BORDER_COLOR, height=1),
+                    cards_list,
+                ],
+                spacing=S3,
+                expand=True,
+            ),
         )

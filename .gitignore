@@ -1,7 +1,15 @@
 ﻿venv/
+.venv/
 __pycache__/
 *.db
+*.db-shm
+*.db-wal
 *.spec
 dist/
 build/
-
+project_code_dump.txt
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
