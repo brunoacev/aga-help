@@ -14,7 +14,7 @@ from views.kanban_view import KanbanView
 from views.logs_view import LogsView
 from views.materials_view import MaterialsView
 from utils.flet_compat import confirm_dialog
-from utils.ui_theme import apply_app_theme
+from utils.ui_theme import S2, apply_app_theme
 
 
 def main(page: ft.Page) -> None:

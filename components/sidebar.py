@@ -5,7 +5,7 @@ from __future__ import annotations
 import flet as ft
 
 from core import colors
-from utils.flet_compat import border_all, get_alignment_center, make_padding_symmetric, safe_update
+from utils.flet_compat import get_alignment_center, make_padding_symmetric, safe_update
 from utils.ui_theme import RADIUS, RADIUS_LG, S1, S2, S3, S4, SIDEBAR_COLLAPSED, SIDEBAR_EXPANDED, icon_button
 
 APP_VERSION = "AGA HELP v1.0"
@@ -108,6 +108,31 @@ class Sidebar(ft.Container):
             size=18,
         )
 
+        self._header_expanded = ft.Row(
+            [
+                ft.Icon(
+                    getattr(ft.Icons, "VIEW_KANBAN_ROUNDED", None) or "view_kanban",
+                    color=colors.PRIMARY,
+                    size=22,
+                ),
+                self.txt_brand,
+                ft.Container(expand=True),
+                self.btn_toggle,
+            ],
+            alignment=ft.MainAxisAlignment.START,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        )
+        self._header_collapsed = ft.Container(
+            content=ft.Icon(
+                getattr(ft.Icons, "VIEW_KANBAN_ROUNDED", None) or "view_kanban",
+                color=colors.PRIMARY,
+                size=20,
+            ),
+            alignment=get_alignment_center(),
+            tooltip="Expandir menu",
+            on_click=self._toggle_sidebar,
+        )
+
         self.footer_expanded = ft.Container(
             content=ft.Column(
                 [
@@ -130,6 +155,7 @@ class Sidebar(ft.Container):
         self.footer_collapsed = ft.Container(
             content=ft.Column(
                 [
+                    ft.Container(content=self.btn_toggle, alignment=get_alignment_center()),
                     ft.Divider(height=1, color=colors.BORDER_COLOR),
                     self.btn_settings,
                     self.btn_clear,
@@ -143,7 +169,7 @@ class Sidebar(ft.Container):
 
         self._body_column = ft.Column(
             [
-                self._build_header(),
+                self._header_expanded,
                 ft.Divider(height=1, color=colors.BORDER_COLOR),
                 ft.Column(self.nav_controls, spacing=S1, expand=True, scroll=ft.ScrollMode.AUTO),
                 self.footer_expanded,
@@ -165,22 +191,6 @@ class Sidebar(ft.Container):
         self.set_active("kanban")
         self._apply_layout()
 
-    def _build_header(self) -> ft.Control:
-        return ft.Row(
-            [
-                ft.Icon(
-                    getattr(ft.Icons, "VIEW_KANBAN_ROUNDED", None) or "view_kanban",
-                    color=colors.PRIMARY,
-                    size=22,
-                ),
-                self.txt_brand,
-                ft.Container(expand=True),
-                self.btn_toggle,
-            ],
-            alignment=ft.MainAxisAlignment.START,
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-        )
-
     def _build_nav_item(self, view_id: str, label: str, icon_name: str, fallback: str) -> ft.Container:
         icon = ft.Icon(
             getattr(ft.Icons, icon_name, None) or fallback,
@@ -194,13 +204,12 @@ class Sidebar(ft.Container):
             weight=ft.FontWeight.W_500,
             overflow=ft.TextOverflow.ELLIPSIS,
         )
-        row = ft.Row(
-            [icon, label_text],
-            spacing=S3,
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-        )
         container = ft.Container(
-            content=row,
+            content=ft.Row(
+                [icon, label_text],
+                spacing=S3,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
             padding=make_padding_symmetric(horizontal=S3, vertical=S2),
             border_radius=RADIUS,
             bgcolor="transparent",
@@ -224,20 +233,28 @@ class Sidebar(ft.Container):
         }
         return container
 
+    def _update_toggle_button(self) -> None:
+        if self.expanded:
+            self.btn_toggle.icon = getattr(ft.Icons, "CHEVRON_LEFT_ROUNDED", None) or "chevron_left"
+            self.btn_toggle.tooltip = "Recolher menu"
+        else:
+            self.btn_toggle.icon = getattr(ft.Icons, "CHEVRON_RIGHT_ROUNDED", None) or "chevron_right"
+            self.btn_toggle.tooltip = "Expandir menu"
+
     def _apply_layout(self) -> None:
         self.width = SIDEBAR_EXPANDED if self.expanded else SIDEBAR_COLLAPSED
-        self.txt_brand.visible = self.expanded
-        self.btn_toggle.icon = (
-            getattr(ft.Icons, "CHEVRON_LEFT_ROUNDED", None) or "chevron_left"
-            if self.expanded
-            else getattr(ft.Icons, "CHEVRON_RIGHT_ROUNDED", None) or "chevron_right"
+        self.padding = make_padding_symmetric(
+            horizontal=S3 if self.expanded else S2,
+            vertical=S4,
         )
-        self.btn_toggle.tooltip = "Recolher menu" if self.expanded else "Expandir menu"
+        self.txt_brand.visible = self.expanded
+        self._update_toggle_button()
+        self._body_column.controls[0] = self._header_expanded if self.expanded else self._header_collapsed
 
         for section_label in self.section_labels:
             section_label.visible = self.expanded
 
-        for view_id, item in self._nav_items.items():
+        for item in self._nav_items.values():
             item["label"].visible = self.expanded
             item["container"].tooltip = None if self.expanded else item["title"]
             if self.expanded:
