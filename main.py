@@ -4,9 +4,13 @@ from __future__ import annotations
 
 import flet as ft
 
+from core.env_loader import load_project_env
+
+load_project_env()
+
 from core import colors
 from core.auth.auth_service import bootstrap_users
-from core.auth.user_session import get_user_handle
+from core.auth.user_session import clear_user
 from core.db.schema import init_db
 from core.services.order_service import clear_all_orders
 from core.supabase_client import get_supabase
@@ -21,13 +25,6 @@ from views.materials_view import MaterialsView
 from views.whatsapp_view import WhatsAppView
 from utils.flet_compat import border_all, confirm_dialog, make_padding_symmetric
 from utils.ui_theme import S2, apply_app_theme
-
-try:
-    from dotenv import load_dotenv
-
-    load_dotenv()
-except ImportError:
-    pass
 
 
 def _offline_banner() -> ft.Container | None:
@@ -62,7 +59,7 @@ def _offline_banner() -> ft.Container | None:
     )
 
 
-def _build_app_shell(page: ft.Page) -> ft.Control:
+def _build_app_shell(page: ft.Page, *, on_logout) -> ft.Control:
     stages = ["Orçamento", "Produção", "Pronto", "Faturado"]
     stage_colors = {
         "Orçamento": colors.COLOR_ORCAMENTO,
@@ -158,18 +155,17 @@ def _build_app_shell(page: ft.Page) -> ft.Control:
             page.snack_bar.open = True
         page.update()
 
-    sidebar = Sidebar(on_navigate=navigate_to, on_clear_click=on_clear_database)
+    sidebar = Sidebar(
+        on_navigate=navigate_to,
+        on_clear_click=on_clear_database,
+        page=page,
+        on_logout=on_logout,
+    )
 
     content_area.content = kanban_view
     kanban_view.refresh()
     sidebar.set_active("kanban")
-
-    handle = get_user_handle(page)
-    user_label = ft.Text(
-        f"Conectado: {handle}" if handle else "",
-        size=11,
-        color=colors.TEXT_MUTED,
-    )
+    sidebar.refresh_user_badge()
 
     main_column_controls: list[ft.Control] = []
     banner = _offline_banner()
@@ -186,8 +182,6 @@ def _build_app_shell(page: ft.Page) -> ft.Control:
             vertical_alignment=ft.CrossAxisAlignment.STRETCH,
         )
     )
-    if handle:
-        main_column_controls.append(user_label)
 
     return ft.Column(main_column_controls, expand=True, spacing=S2)
 
@@ -205,7 +199,12 @@ def main(page: ft.Page) -> None:
     root = ft.Container(expand=True, bgcolor=colors.BG_PRIMARY)
 
     def on_login_success(_user: dict) -> None:
-        root.content = _build_app_shell(page)
+        def on_logout() -> None:
+            clear_user(page)
+            root.content = LoginView(page, on_login_success)
+            page.update()
+
+        root.content = _build_app_shell(page, on_logout=on_logout)
         page.update()
 
     root.content = LoginView(page, on_login_success)
