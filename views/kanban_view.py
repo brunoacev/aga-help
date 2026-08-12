@@ -7,6 +7,7 @@ import flet as ft
 from core import colors
 from core.services.order_service import delete_order, get_orders, update_order_status
 from components.kanban_column import KanbanColumn
+from components.order_details_dialog import show_order_items_dialog
 from utils.flet_compat import confirm_dialog
 from utils.ui_theme import S4, page_container, page_header
 
@@ -40,6 +41,7 @@ class KanbanView(ft.Container):
                     stages=self.stages,
                     on_move_callback=self._move_order,
                     on_delete_callback=self._confirm_delete,
+                    on_details_callback=self._show_order_details,
                     expand=True,
                 )
             )
@@ -65,6 +67,9 @@ class KanbanView(ft.Container):
     def _move_order(self, order_id: int, new_stage: str) -> None:
         update_order_status(order_id, new_stage)
         self.refresh()
+
+    def _show_order_details(self, order: dict) -> None:
+        show_order_items_dialog(self.app_page, order)
 
     def _confirm_delete(self, order_id: int) -> None:
         confirm_dialog(

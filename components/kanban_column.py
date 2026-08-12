@@ -21,6 +21,7 @@ class KanbanColumn(ft.Container):
         stages: list,
         on_move_callback,
         on_delete_callback,
+        on_details_callback,
         *,
         expand: bool | int = False,
     ):
@@ -53,14 +54,24 @@ class KanbanColumn(ft.Container):
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
         )
 
-        cards_list = ft.Column(spacing=S3, scroll=ft.ScrollMode.AUTO, expand=True, tight=True)
+        cards_list = ft.Column(
+            spacing=S3,
+            scroll=ft.ScrollMode.AUTO,
+            expand=True,
+            tight=True,
+            horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+        )
         for order in orders:
             cards_list.controls.append(
-                OrderCard(
-                    order=order,
-                    stages=stages,
-                    on_move_callback=on_move_callback,
-                    on_delete_callback=on_delete_callback,
+                ft.Container(
+                    content=OrderCard(
+                        order=order,
+                        stages=stages,
+                        on_move_callback=on_move_callback,
+                        on_delete_callback=on_delete_callback,
+                        on_details_callback=on_details_callback,
+                    ),
+                    padding=make_padding_symmetric(horizontal=S2),
                 )
             )
 

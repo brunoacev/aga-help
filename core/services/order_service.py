@@ -8,6 +8,7 @@ from core.db import orders_repository
 from core.db.logs_repository import add_log
 from utils.dates import add_business_days
 from utils.formatting import parse_brl
+from utils.order_items import serialize_order_items
 from utils.sanitization import sanitize_name, sanitize_text
 
 SERVICE_PARTS = "componentes"
@@ -64,6 +65,7 @@ def create_order(form_data: dict) -> tuple[bool, str]:
         width=sanitize_text(form_data.get("width", ""), max_length=20),
         height=sanitize_text(form_data.get("height", ""), max_length=20),
         status="Orçamento",
+        items_json=serialize_order_items(form_data.get("items") or []),
     )
     return True, ""
 

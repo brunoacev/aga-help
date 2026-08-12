@@ -143,6 +143,18 @@ class OrderFormController:
         service_type = form_data.get("service_type", SERVICE_PARTS)
         if service_type == SERVICE_PARTS and not (form_data.get("description") or "").strip():
             form_data["description"] = self.components_summary()
+        if service_type == SERVICE_PARTS:
+            form_data["items"] = [
+                {
+                    "code": item["code"],
+                    "name": item["name"],
+                    "qty": item["qty"],
+                    "dim": item.get("dim", ""),
+                }
+                for item in self.selected_components
+            ]
+        else:
+            form_data["items"] = []
 
         success, persist_error = create_order(form_data)
         if success:

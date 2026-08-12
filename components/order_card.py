@@ -7,13 +7,13 @@ import flet as ft
 from core import colors
 from utils.formatting import format_brl
 from utils.flet_compat import border_all, make_padding_symmetric, safe_update
-from utils.ui_theme import FONT_BODY, FONT_CAPTION, FONT_LABEL, ORDER_CARD_WIDTH, RADIUS, S2, S3, icon_button
+from utils.ui_theme import FONT_BODY, FONT_CAPTION, FONT_LABEL, RADIUS, S2, S3, icon_button
 
 
 class OrderCard(ft.Container):
     """Representa um pedido na coluna Kanban."""
 
-    def __init__(self, order, stages, on_move_callback, on_delete_callback):
+    def __init__(self, order, stages, on_move_callback, on_delete_callback, on_details_callback):
         order_id = order["id"]
         order_number = order.get("order_number", f"#{order_id}")
         reseller_name = order.get("reseller_name", "Revenda Desconhecida")
@@ -43,6 +43,8 @@ class OrderCard(ft.Container):
                     color=colors.PRIMARY,
                     weight=ft.FontWeight.W_500,
                     overflow=ft.TextOverflow.ELLIPSIS,
+                    expand=True,
+                    text_align=ft.TextAlign.RIGHT,
                 ),
             ],
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -123,6 +125,13 @@ class OrderCard(ft.Container):
                 )
             )
 
+        btn_details = icon_button(
+            "LIST_ALT_ROUNDED",
+            "list_alt",
+            color=colors.TEXT_SECONDARY,
+            tooltip="Ver Detalhes dos Itens",
+            on_click=lambda _: on_details_callback(order),
+        )
         btn_delete = icon_button(
             "DELETE_OUTLINE",
             "delete",
@@ -132,12 +141,14 @@ class OrderCard(ft.Container):
         )
 
         actions_row = ft.Row(
-            [ft.Row(action_buttons, spacing=0), btn_delete],
+            [
+                ft.Row([btn_details, *action_buttons], spacing=0),
+                btn_delete,
+            ],
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
         )
 
         super().__init__(
-            width=ORDER_CARD_WIDTH,
             bgcolor=colors.BG_SURFACE_LIGHT,
             border=border_all(colors.BORDER_COLOR),
             border_radius=RADIUS,
