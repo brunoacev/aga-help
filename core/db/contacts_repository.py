@@ -115,10 +115,34 @@ def get_contact_by_name(name: str) -> dict | None:
     with get_connection() as conn:
         conn.row_factory = _row_factory
         row = conn.execute(
-            "SELECT phone, address FROM contacts WHERE name LIKE ? LIMIT 1",
+            "SELECT name, phone, address FROM contacts WHERE name LIKE ? LIMIT 1",
             (clean_q,),
         ).fetchone()
         return dict(row) if row else None
+
+
+def find_contact_by_phone(phone: str) -> dict | None:
+    """Busca contato da agenda local pelo número (compara somente dígitos)."""
+    digits = "".join(ch for ch in str(phone or "") if ch.isdigit())
+    if len(digits) < 10:
+        return None
+    local = digits[-11:] if len(digits) >= 11 else digits[-10:]
+    with get_connection() as conn:
+        conn.row_factory = _row_factory
+        rows = conn.execute(
+            """
+            SELECT name, phone, address FROM contacts
+            WHERE phone != ''
+            """,
+        ).fetchall()
+    for row in rows:
+        row_digits = "".join(ch for ch in str(row.get("phone") or "") if ch.isdigit())
+        if not row_digits:
+            continue
+        row_local = row_digits[-11:] if len(row_digits) >= 11 else row_digits[-10:]
+        if row_local == local or row_digits.endswith(local) or local.endswith(row_local):
+            return dict(row)
+    return None
 
 
 def _row_factory(cursor, row):

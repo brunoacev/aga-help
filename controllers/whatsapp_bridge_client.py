@@ -9,6 +9,8 @@ import sys
 import time
 from pathlib import Path
 
+from urllib.parse import quote
+
 import requests
 
 BRIDGE_PORT = int(os.getenv("WHATSAPP_BRIDGE_PORT", "5001"))
@@ -145,6 +147,13 @@ class WhatsAppBridgeClient:
         payload = self._get("/messages", chat_id=chat_id)
         messages = payload.get("messages") or []
         return messages if isinstance(messages, list) else []
+
+    def get_media_url(self, chat_id: str, message_id: str) -> str:
+        return (
+            f"{self.base_url}/media"
+            f"?chat_id={quote(chat_id, safe='@.:')}"
+            f"&msg_id={quote(message_id, safe='')}"
+        )
 
     def send_message(self, chat_id: str, message: str) -> dict:
         return self._post("/send", {"chat_id": chat_id, "message": message})

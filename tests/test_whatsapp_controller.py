@@ -24,7 +24,8 @@ def test_list_conversations_from_bridge():
     controller.client.list_chats.return_value = [
         {
             "id": "5585999999999@s.whatsapp.net",
-            "name": "Cliente Teste",
+            "name": "Maria Silva",
+            "contact_name": "Maria Silva",
             "phone": "+5585999999999",
             "last_message": "Olá",
             "unread": 1,
@@ -33,8 +34,28 @@ def test_list_conversations_from_bridge():
     ]
     conversations = controller.list_conversations()
     assert len(conversations) == 1
+    assert conversations[0].contact_name == "Maria Silva"
     assert conversations[0].phone == "+55 (85) 99999-9999"
     assert conversations[0].is_group is False
+
+
+def test_list_conversations_lid_chat_without_fake_phone():
+    controller = WhatsAppController()
+    controller.client = MagicMock()
+    controller.client.list_chats.return_value = [
+        {
+            "id": "123456789012345@lid",
+            "name": "João",
+            "contact_name": "João",
+            "phone": "+5585988776655",
+            "last_message": "Oi",
+            "unread": 0,
+            "is_group": False,
+        }
+    ]
+    conversations = controller.list_conversations()
+    assert conversations[0].contact_name == "João"
+    assert conversations[0].phone == "+55 (85) 98877-6655"
 
 
 def test_list_group_conversations_from_bridge():
@@ -89,6 +110,34 @@ def test_get_messages_from_bridge():
     messages = controller.get_messages("558599999999@s.whatsapp.net")
     assert len(messages) == 2
     assert messages[0].text == "Oi"
+
+
+def test_get_audio_messages_from_bridge():
+    controller = WhatsAppController()
+    controller.client = MagicMock()
+    controller.client.list_messages.return_value = [
+        {
+            "id": "ABC123",
+            "from_me": False,
+            "text": "🎤 Áudio",
+            "time": "10:00",
+            "type": "audio",
+            "has_media": True,
+        },
+    ]
+    messages = controller.get_messages("5585999999999@s.whatsapp.net")
+    assert messages[0].msg_type == "audio"
+    assert messages[0].has_media is True
+    assert messages[0].message_id == "ABC123"
+
+
+def test_get_media_url():
+    controller = WhatsAppController()
+    controller.client = MagicMock()
+    controller.client.get_media_url.return_value = "http://127.0.0.1:5001/media?chat_id=x&msg_id=y"
+    url = controller.get_media_url("5585999999999@s.whatsapp.net", "ABC123")
+    assert "media" in url
+    controller.client.get_media_url.assert_called_once_with("5585999999999@s.whatsapp.net", "ABC123")
 
 
 def test_connection_status_mapping():

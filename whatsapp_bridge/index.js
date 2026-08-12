@@ -4,7 +4,10 @@ import path from "path";
 import { fileURLToPath } from "url";
 import makeWASocket, {
   DisconnectReason,
+  downloadMediaMessage,
   fetchLatestBaileysVersion,
+  isJidUser,
+  isLidUser,
   useMultiFileAuthState,
 } from "@whiskeysockets/baileys";
 import pino from "pino";
@@ -12,6 +15,7 @@ import pino from "pino";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const AUTH_DIR = path.join(__dirname, "auth_info");
+const MEDIA_DIR = path.join(__dirname, "media_cache");
 const PORT = Number(process.env.WHATSAPP_BRIDGE_PORT || 5001);
 const MAX_MESSAGES_PER_CHAT = 300;
 
@@ -27,16 +31,115 @@ let starting = false;
 const chatStore = new Map();
 const messageStore = new Map();
 const messageKeys = new Map();
+const messageRawStore = new Map();
 const groupMetadataCache = new Map();
+const contactStore = new Map();
+const lidPhoneMap = new Map();
 
 function isGroupJid(jid) {
   return Boolean(jid && jid.endsWith("@g.us"));
 }
 
-function formatPhone(jid) {
+function normalizePhoneJid(value) {
+  if (!value) return "";
+  const raw = String(value).trim();
+  if (!raw) return "";
+  if (raw.includes("@")) {
+    return isJidUser(raw) || raw.endsWith("@s.whatsapp.net") ? raw.split(":")[0] + "@s.whatsapp.net" : "";
+  }
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+  return `${digits}@s.whatsapp.net`;
+}
+
+function registerLidPhone(lidJid, phoneJid) {
+  const lid = String(lidJid || "").trim();
+  const phone = normalizePhoneJid(phoneJid);
+  if (lid && phone && isLidUser(lid)) {
+    lidPhoneMap.set(lid, phone);
+  }
+}
+
+function storeContact(contact) {
+  if (!contact?.id) return;
+  contactStore.set(contact.id, { ...(contactStore.get(contact.id) || {}), ...contact });
+  if (contact.lid) {
+    contactStore.set(contact.lid, { ...(contactStore.get(contact.lid) || {}), ...contact, id: contact.lid });
+    if (contact.jid) registerLidPhone(contact.lid, contact.jid);
+  }
+  if (contact.jid) {
+    const phoneJid = normalizePhoneJid(contact.jid);
+    if (phoneJid) {
+      contactStore.set(phoneJid, { ...(contactStore.get(phoneJid) || {}), ...contact, id: phoneJid });
+      if (contact.lid) registerLidPhone(contact.lid, phoneJid);
+    }
+  }
+  if (isLidUser(contact.id) && contact.jid) {
+    registerLidPhone(contact.id, contact.jid);
+  }
+  if (isJidUser(contact.id) && contact.lid) {
+    registerLidPhone(contact.lid, contact.id);
+  }
+}
+
+function jidDigits(jid) {
+  return String(jid || "").split("@")[0].split(":")[0].replace(/\D/g, "");
+}
+
+function isPhoneLike(value, jid) {
+  const digits = String(value || "").replace(/\D/g, "");
+  const phoneDigits = jidDigits(jid);
+  if (!digits || digits.length < 10) return false;
+  if (!phoneDigits) return digits.length >= 10;
+  return digits === phoneDigits || digits.endsWith(phoneDigits.slice(-10));
+}
+
+function resolvePhoneJid(jid) {
   if (!jid) return "";
-  const raw = jid.split("@")[0].split(":")[0];
+  if (isJidUser(jid) || jid.endsWith("@s.whatsapp.net")) {
+    return normalizePhoneJid(jid);
+  }
+  if (isLidUser(jid)) {
+    const mapped = lidPhoneMap.get(jid);
+    if (mapped) return mapped;
+    const contact = contactStore.get(jid);
+    if (contact?.jid) return normalizePhoneJid(contact.jid);
+  }
+  return "";
+}
+
+function resolveContactName(jid) {
+  if (isGroupJid(jid)) return "";
+  const phoneJid = resolvePhoneJid(jid) || jid;
+  const candidates = [];
+  for (const key of [jid, phoneJid]) {
+    const contact = contactStore.get(key);
+    if (contact) {
+      candidates.push(contact.name, contact.notify, contact.verifiedName);
+    }
+  }
+  const chat = chatStore.get(jid);
+  if (chat) {
+    candidates.push(chat.name, chat.verifiedName);
+  }
+  for (const candidate of candidates) {
+    const value = String(candidate || "").trim();
+    if (value && !value.includes("@") && !isPhoneLike(value, phoneJid)) {
+      return value;
+    }
+  }
+  return "";
+}
+
+function formatPhoneFromJid(jid) {
+  const phoneJid = resolvePhoneJid(jid);
+  if (!phoneJid) return "";
+  const raw = phoneJid.split("@")[0].split(":")[0];
   return raw.startsWith("+") ? raw : `+${raw}`;
+}
+
+function formatPhone(jid) {
+  return formatPhoneFromJid(jid) || "";
 }
 
 function jidFromTarget(target) {
@@ -46,6 +149,27 @@ function jidFromTarget(target) {
   return `${digits}@s.whatsapp.net`;
 }
 
+function rawMessageKey(chatId, msgId) {
+  return `${chatId}:${msgId}`;
+}
+
+function storeRawMessage(msg) {
+  const chatId = msg.key?.remoteJid;
+  const msgId = msg.key?.id;
+  if (chatId && msgId) {
+    messageRawStore.set(rawMessageKey(chatId, msgId), msg);
+  }
+}
+
+function messageKind(msg) {
+  const content = msg.message || {};
+  if (content.audioMessage) return "audio";
+  if (content.imageMessage) return "image";
+  if (content.videoMessage) return "video";
+  if (content.documentMessage) return "document";
+  if (content.stickerMessage) return "sticker";
+  return "text";
+}
 function extractMessageText(msg) {
   const content = msg.message || {};
   if (content.conversation) return content.conversation;
@@ -65,19 +189,25 @@ function extractMessageText(msg) {
 
 function parseMessage(msg) {
   const text = extractMessageText(msg);
+  const kind = messageKind(msg);
   const tsRaw = msg.messageTimestamp ? Number(msg.messageTimestamp) : Date.now() / 1000;
   const ts = new Date(tsRaw * (tsRaw > 1e12 ? 1 : 1000));
   const participant = msg.key?.participant || "";
+  if (participant && msg.key?.senderPn) {
+    registerLidPhone(participant, msg.key.senderPn);
+  }
+  const senderPhoneJid = participant ? resolvePhoneJid(participant) || normalizePhoneJid(msg.key?.senderPn) : "";
   return {
     id: msg.key?.id || "",
     from_me: Boolean(msg.key?.fromMe),
     text,
     time: ts.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
     timestamp: ts.getTime(),
-    type: msg.message ? Object.keys(msg.message)[0] || "text" : "text",
+    type: kind,
+    has_media: kind === "audio",
     sender_jid: participant,
-    sender_name: msg.pushName || "",
-    sender_phone: participant ? formatPhone(participant) : "",
+    sender_name: resolveContactName(participant) || msg.pushName || "",
+    sender_phone: senderPhoneJid ? formatPhoneFromJid(senderPhoneJid) : "",
   };
 }
 
@@ -118,8 +248,14 @@ function appendMessage(msg) {
   const jid = msg.key?.remoteJid;
   if (!jid || jid.includes("@broadcast")) return null;
 
+  if (isLidUser(jid) && msg.key?.senderPn && !msg.key?.fromMe) {
+    registerLidPhone(jid, msg.key.senderPn);
+  }
+
   const parsed = parseMessage(msg);
-  if (!parsed.text) return null;
+  if (!parsed.text && parsed.type !== "audio") return null;
+
+  storeRawMessage(msg);
 
   const bucket = messageStore.get(jid) || [];
   if (parsed.id && bucket.some((item) => item.id === parsed.id)) {
@@ -141,6 +277,21 @@ function appendMessage(msg) {
     conversation: parsed.text,
     conversationTimestamp: parsed.timestamp,
   });
+
+  if (!isGroupJid(jid) && msg.pushName && !msg.key?.fromMe) {
+    const prev = contactStore.get(jid) || { id: jid };
+    if (!prev.name && !prev.notify) {
+      storeContact({ ...prev, id: jid, name: msg.pushName, notify: msg.pushName });
+    }
+    const phoneJid = resolvePhoneJid(jid);
+    if (phoneJid) {
+      const phoneContact = contactStore.get(phoneJid) || { id: phoneJid, jid: phoneJid };
+      if (!phoneContact.name && !phoneContact.notify) {
+        storeContact({ ...phoneContact, name: msg.pushName, notify: msg.pushName });
+      }
+    }
+  }
+
   return parsed;
 }
 
@@ -161,13 +312,14 @@ async function formatChat(chat) {
     name = groupName;
     avatar = meta?.avatar || "";
   } else {
-    name = chat.name || formatPhone(chat.id);
+    name = resolveContactName(chat.id);
   }
 
   return {
     id: chat.id,
     name,
-    phone: isGroup ? "" : formatPhone(chat.id),
+    contact_name: isGroup ? "" : name,
+    phone: isGroup ? "" : formatPhoneFromJid(chat.id),
     last_message: last,
     unread: chat.unreadCount || 0,
     timestamp: chat.conversationTimestamp || 0,
@@ -178,8 +330,9 @@ async function formatChat(chat) {
 }
 
 function bindEvents(socket) {
-  socket.ev.on("messaging-history.set", ({ chats, messages }) => {
+  socket.ev.on("messaging-history.set", ({ chats, messages, contacts }) => {
     for (const chat of chats || []) chatStore.set(chat.id, chat);
+    for (const contact of contacts || []) storeContact(contact);
     for (const msg of messages || []) appendMessage(msg);
   });
 
@@ -196,6 +349,21 @@ function bindEvents(socket) {
       const prev = chatStore.get(update.id) || { id: update.id };
       chatStore.set(update.id, { ...prev, ...update });
     }
+  });
+
+  socket.ev.on("contacts.upsert", (contacts) => {
+    for (const contact of contacts || []) storeContact(contact);
+  });
+
+  socket.ev.on("contacts.update", (updates) => {
+    for (const update of updates || []) {
+      if (!update?.id) continue;
+      storeContact({ ...(contactStore.get(update.id) || { id: update.id }), ...update });
+    }
+  });
+
+  socket.ev.on("chats.phoneNumberShare", ({ lid, jid }) => {
+    registerLidPhone(lid, jid);
   });
 
   socket.ev.on("messages.upsert", ({ messages, type }) => {
@@ -267,7 +435,10 @@ async function connectWhatsApp() {
       chatStore.clear();
       messageStore.clear();
       messageKeys.clear();
+      messageRawStore.clear();
       groupMetadataCache.clear();
+      contactStore.clear();
+      lidPhoneMap.clear();
       if (!loggedOut) {
         setTimeout(connectWhatsApp, 2500);
       }
@@ -318,6 +489,49 @@ app.get("/messages", (req, res) => {
   }
   const messages = sortMessages(messageStore.get(chatId) || []);
   res.json({ messages });
+});
+
+app.get("/media", async (req, res) => {
+  const chatId = req.query.chat_id;
+  const msgId = req.query.msg_id;
+  if (!chatId || !msgId) {
+    return res.status(400).json({ ok: false, error: "chat_id e msg_id são obrigatórios" });
+  }
+  if (!sock || status !== "CONNECTED") {
+    return res.status(503).json({ ok: false, error: "WhatsApp desconectado" });
+  }
+
+  const cachePath = path.join(MEDIA_DIR, `${Buffer.from(`${chatId}:${msgId}`).toString("hex")}.ogg`);
+  try {
+    if (fs.existsSync(cachePath)) {
+      res.setHeader("Content-Type", "audio/ogg");
+      return res.sendFile(cachePath);
+    }
+
+    const raw = messageRawStore.get(rawMessageKey(chatId, msgId));
+    if (!raw) {
+      return res.status(404).json({ ok: false, error: "Mídia não encontrada para esta mensagem" });
+    }
+
+    const logger = pino({ level: "silent" });
+    const buffer = await downloadMediaMessage(
+      raw,
+      "buffer",
+      {},
+      { logger, reuploadRequest: sock.updateMediaMessage },
+    );
+
+    if (!fs.existsSync(MEDIA_DIR)) {
+      fs.mkdirSync(MEDIA_DIR, { recursive: true });
+    }
+    fs.writeFileSync(cachePath, buffer);
+
+    const mimetype = raw.message?.audioMessage?.mimetype || "audio/ogg";
+    res.setHeader("Content-Type", String(mimetype).split(";")[0] || "audio/ogg");
+    res.send(buffer);
+  } catch (error) {
+    res.status(500).json({ ok: false, error: String(error.message || error) });
+  }
 });
 
 app.post("/send", async (req, res) => {
@@ -379,7 +593,10 @@ app.post("/logout", async (_req, res) => {
     chatStore.clear();
     messageStore.clear();
     messageKeys.clear();
+    messageRawStore.clear();
     groupMetadataCache.clear();
+    contactStore.clear();
+    lidPhoneMap.clear();
     if (fs.existsSync(AUTH_DIR)) {
       fs.rmSync(AUTH_DIR, { recursive: true, force: true });
     }

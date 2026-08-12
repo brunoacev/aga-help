@@ -11,6 +11,7 @@ from controllers.whatsapp_bridge_client import (
     WhatsAppBridgeClient,
     WhatsAppBridgeProcess,
 )
+from core.db.contacts_repository import find_contact_by_phone
 from utils.formatting import format_br_phone
 from utils.qr_code import qr_data_uri
 
@@ -31,6 +32,7 @@ class WhatsAppConversation:
     is_group: bool = False
     group_name: str = ""
     avatar: str = ""
+    contact_name: str = ""
 
 
 @dataclass(frozen=True)
@@ -45,6 +47,8 @@ class WhatsAppMessage:
     sender_name: str = ""
     sender_phone: str = ""
     sender_jid: str = ""
+    message_id: str = ""
+    has_media: bool = False
 
 
 class WhatsAppController:
@@ -110,19 +114,33 @@ class WhatsAppController:
         conversations: list[WhatsAppConversation] = []
         for row in rows:
             is_group = bool(row.get("is_group")) or str(row.get("id") or "").endswith("@g.us")
-            raw_phone = str(row.get("phone") or row.get("id") or "")
+            chat_id = str(row.get("id") or "")
+            raw_phone = str(row.get("phone") or "")
+            if not is_group and not raw_phone and chat_id and not chat_id.endswith("@lid"):
+                raw_phone = chat_id
+            formatted_phone = "" if is_group else format_br_phone(raw_phone)
             group_name = str(row.get("group_name") or row.get("name") or "Grupo")
-            display_name = group_name if is_group else str(row.get("name") or "Contato")
+            contact_name = str(row.get("contact_name") or row.get("name") or "").strip()
+            if not is_group and contact_name and (
+                "@" in contact_name
+                or (formatted_phone and format_br_phone(contact_name) == formatted_phone)
+            ):
+                contact_name = ""
+            if not is_group and not contact_name and formatted_phone:
+                local = find_contact_by_phone(formatted_phone)
+                if local and local.get("name"):
+                    contact_name = str(local["name"]).strip()
             conversations.append(
                 WhatsAppConversation(
-                    id=str(row.get("id") or ""),
-                    name=display_name,
-                    phone="" if is_group else format_br_phone(raw_phone),
+                    id=chat_id,
+                    name=group_name if is_group else (contact_name or formatted_phone or "Contato"),
+                    phone=formatted_phone,
                     last_message=str(row.get("last_message") or ""),
                     unread=int(row.get("unread") or 0),
                     is_group=is_group,
                     group_name=group_name if is_group else "",
                     avatar=str(row.get("avatar") or ""),
+                    contact_name="" if is_group else contact_name,
                 )
             )
         return conversations
@@ -147,10 +165,15 @@ class WhatsAppController:
                     sender_name=str(row.get("sender_name") or ""),
                     sender_phone=format_br_phone(sender_phone_raw) if sender_phone_raw else "",
                     sender_jid=str(row.get("sender_jid") or ""),
+                    message_id=str(row.get("id") or ""),
+                    has_media=bool(row.get("has_media")) or str(row.get("type") or "") == "audio",
                 )
             )
         messages.sort(key=lambda item: item.timestamp)
         return messages
+
+    def get_media_url(self, conversation_id: str, message_id: str) -> str:
+        return self.client.get_media_url(conversation_id, message_id)
 
     def mark_conversation_read(self, conversation_id: str) -> None:
         if not conversation_id:

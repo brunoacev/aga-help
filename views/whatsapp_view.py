@@ -18,6 +18,7 @@ from core import colors
 from utils.formatting import format_br_phone
 from utils.flet_compat import border_all, get_alignment_center, make_padding_symmetric, show_snackbar
 from utils.ui_theme import FONT_BODY, FONT_CAPTION, RADIUS, S1, S2, S3, S4, field_style, page_header, text_section_heading
+from utils.whatsapp_audio import play_audio_from_url
 
 QR_INSTRUCTIONS = "Abra o WhatsApp > Aparelhos conectados > Conectar um aparelho"
 NODE_DOWNLOAD_URL = "https://nodejs.org/"
@@ -137,7 +138,12 @@ class WhatsAppView(ft.Container):
             on_change=self._on_search_conversations,
             **field_style(),
         )
-        self.conversations_column = ft.Column(spacing=S1, scroll=ft.ScrollMode.AUTO, expand=True)
+        self.conversations_column = ft.Column(
+            spacing=S1,
+            scroll=ft.ScrollMode.AUTO,
+            expand=True,
+            horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+        )
         self.chat_header_icon = ft.Icon(self._group_icon, size=20, color=colors.WA_ACCENT, visible=False)
         self.chat_header_text = ft.Text(
             "Selecione uma conversa",
@@ -164,11 +170,9 @@ class WhatsAppView(ft.Container):
             visible=True,
         )
         self.txt_message = ft.TextField(
-            hint_text="Digite uma mensagem",
+            hint_text="Digite uma mensagem (Enter para enviar)",
             expand=True,
-            multiline=True,
-            min_lines=1,
-            max_lines=4,
+            multiline=False,
             disabled=True,
             on_submit=self._on_send_message,
             **field_style(),
@@ -357,6 +361,7 @@ class WhatsAppView(ft.Container):
             item
             for item in conversations
             if self._chat_filter in item.name.lower()
+            or self._chat_filter in (item.contact_name or "").lower()
             or self._chat_filter in item.phone.lower()
             or self._chat_filter in (item.group_name or "").lower()
             or self._chat_filter in format_br_phone(item.phone).lower()
@@ -391,76 +396,98 @@ class WhatsAppView(ft.Container):
         if self.selected_conversation_id not in valid_ids:
             self._select_conversation(conversations[0].id, update=False)
 
-    def _conversation_title(self, conversation: WhatsAppConversation) -> str:
+    def _conversation_contact_name(self, conversation: WhatsAppConversation) -> str:
         if conversation.is_group:
             return conversation.group_name or conversation.name or "Grupo"
-        formatted = format_br_phone(conversation.phone) or format_br_phone(conversation.id)
-        name = (conversation.name or "").strip()
-        if name and "@" not in name:
-            name_digits = "".join(ch for ch in name if ch.isdigit())
-            phone_digits = "".join(ch for ch in (conversation.phone or conversation.id) if ch.isdigit())
-            if name_digits and name_digits == phone_digits:
-                return formatted or name
-            if format_br_phone(name) == formatted:
-                return formatted or name
-            return name
-        return formatted or "Contato"
+        return (conversation.contact_name or "").strip()
+
+    def _conversation_phone_line(self, conversation: WhatsAppConversation) -> str:
+        if conversation.is_group:
+            return ""
+        if conversation.phone:
+            return format_br_phone(conversation.phone) or conversation.phone
+        if conversation.id.endswith("@lid"):
+            return ""
+        return format_br_phone(conversation.id)
 
     def _build_conversation_tile(self, conversation: WhatsAppConversation) -> ft.Container:
         is_active = conversation.id == self.selected_conversation_id
         preview_color = colors.WA_LIST_NAME if conversation.unread else colors.WA_LIST_PREVIEW
-        title = self._conversation_title(conversation)
         preview = conversation.last_message or "Sem mensagens"
-        avatar_control = (
-            ft.CircleAvatar(
-                foreground_image_src=conversation.avatar or None,
-                content=ft.Icon(self._group_icon, color=colors.WA_BUBBLE_TEXT, size=18),
-                bgcolor=colors.WA_INCOMING_BUBBLE,
-                radius=18,
-            )
-            if conversation.is_group
-            else ft.CircleAvatar(
-                content=ft.Text(
-                    (title[:1] or "?").upper(),
-                    color=colors.WA_BUBBLE_TEXT,
+        contact_name = self._conversation_contact_name(conversation)
+        phone_line = self._conversation_phone_line(conversation)
+
+        text_lines: list[ft.Control] = []
+        if conversation.is_group:
+            text_lines.append(
+                ft.Text(
+                    contact_name,
+                    size=FONT_BODY,
                     weight=ft.FontWeight.W_600,
-                ),
-                bgcolor=colors.WA_INCOMING_BUBBLE,
-                radius=18,
+                    color=colors.WA_LIST_NAME,
+                    overflow=ft.TextOverflow.ELLIPSIS,
+                    expand=True,
+                )
+            )
+        else:
+            if contact_name:
+                text_lines.append(
+                    ft.Text(
+                        contact_name,
+                        size=FONT_BODY,
+                        weight=ft.FontWeight.W_600,
+                        color=colors.WA_LIST_NAME,
+                        overflow=ft.TextOverflow.ELLIPSIS,
+                        expand=True,
+                    )
+                )
+            if phone_line:
+                text_lines.append(
+                    ft.Text(
+                        phone_line,
+                        size=10,
+                        color=colors.WA_META_INCOMING,
+                        overflow=ft.TextOverflow.ELLIPSIS,
+                        expand=True,
+                    )
+                )
+        text_lines.append(
+            ft.Text(
+                preview,
+                size=FONT_CAPTION,
+                color=preview_color,
+                overflow=ft.TextOverflow.ELLIPSIS,
+                expand=True,
             )
         )
-        return ft.Container(
-            content=ft.Row(
-                [
-                    avatar_control,
-                    ft.Column(
-                        [
-                            ft.Text(
-                                title,
-                                size=FONT_BODY,
-                                weight=ft.FontWeight.W_600,
-                                color=colors.WA_LIST_NAME,
-                                overflow=ft.TextOverflow.ELLIPSIS,
-                            ),
-                            ft.Text(
-                                preview,
-                                size=FONT_CAPTION,
-                                color=preview_color,
-                                overflow=ft.TextOverflow.ELLIPSIS,
-                            ),
-                        ],
-                        spacing=S1,
-                        expand=True,
-                    ),
-                ],
-                spacing=S2,
-                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+
+        tile = ft.Container(
+            content=ft.Column(
+                text_lines,
+                spacing=S1,
             ),
             padding=make_padding_symmetric(horizontal=S2, vertical=S2),
             border_radius=RADIUS,
             bgcolor=colors.WA_LIST_ACTIVE if is_active else colors.WA_PANEL_BG,
-            ink=True,
-            on_click=lambda _, cid=conversation.id: self._select_conversation(cid),
+        )
+
+        def on_hover(e, container=tile, active=is_active):
+            container.bgcolor = (
+                colors.WA_LIST_ACTIVE
+                if active
+                else (colors.WA_INCOMING_BUBBLE if e.data == "true" else colors.WA_PANEL_BG)
+            )
+            try:
+                container.update()
+            except RuntimeError:
+                pass
+
+        return ft.GestureDetector(
+            content=tile,
+            mouse_cursor=ft.MouseCursor.CLICK,
+            on_tap=lambda _e, cid=conversation.id: self._select_conversation(cid),
+            on_hover=on_hover,
+            expand=True,
         )
 
     def _sender_label(self, message: WhatsAppMessage) -> str:
@@ -506,12 +533,7 @@ class WhatsAppView(ft.Container):
                 )
         bubble_lines.extend(
             [
-                ft.Text(
-                    message.text,
-                    size=FONT_BODY,
-                    color=colors.WA_BUBBLE_TEXT,
-                    selectable=True,
-                ),
+                *self._build_message_body(message),
                 ft.Row(footer_controls, spacing=S1, alignment=ft.MainAxisAlignment.END),
             ]
         )
@@ -532,6 +554,51 @@ class WhatsAppView(ft.Container):
             ],
             alignment=alignment,
         )
+
+    def _build_message_body(self, message: WhatsAppMessage) -> list[ft.Control]:
+        if message.msg_type == "audio" and message.message_id and self.selected_conversation_id:
+            play_icon = getattr(ft.Icons, "PLAY_ARROW", None) or getattr(ft.Icons, "PLAY_CIRCLE", None) or "play_arrow"
+            return [
+                ft.Row(
+                    [
+                        ft.IconButton(
+                            icon=play_icon,
+                            icon_color=colors.WA_BUBBLE_TEXT,
+                            bgcolor=colors.WA_ACCENT,
+                            tooltip="Reproduzir áudio",
+                            on_click=lambda _e, mid=message.message_id: self._on_play_audio(mid),
+                        ),
+                        ft.Text(
+                            "Mensagem de voz",
+                            size=FONT_BODY,
+                            color=colors.WA_BUBBLE_TEXT,
+                        ),
+                    ],
+                    spacing=S2,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                )
+            ]
+        return [
+            ft.Text(
+                message.text,
+                size=FONT_BODY,
+                color=colors.WA_BUBBLE_TEXT,
+                selectable=True,
+            )
+        ]
+
+    def _on_play_audio(self, message_id: str) -> None:
+        if not self.selected_conversation_id or not message_id:
+            show_snackbar(self.app_page, "Áudio indisponível.", success=False)
+            return
+        if self.app_page:
+            self.app_page.run_task(self._play_audio_async, self.selected_conversation_id, message_id)
+
+    async def _play_audio_async(self, chat_id: str, message_id: str) -> None:
+        url = self.controller.get_media_url(chat_id, message_id)
+        ok, error = await asyncio.to_thread(play_audio_from_url, url)
+        if not ok:
+            show_snackbar(self.app_page, error or "Não foi possível reproduzir.", success=False)
 
     def _scroll_chat_to_bottom(self, *, duration: int = 300) -> None:
         if not self.messages_list.controls:
@@ -601,12 +668,12 @@ class WhatsAppView(ft.Container):
 
         self._selected_is_group = conversation.is_group
         self.chat_header_icon.visible = conversation.is_group
+        contact_name = self._conversation_contact_name(conversation)
         if conversation.is_group:
-            self.chat_header_text.value = self._conversation_title(conversation)
+            self.chat_header_text.value = contact_name
         else:
-            title = conversation.name or format_br_phone(conversation.phone) or conversation.phone
-            phone = format_br_phone(conversation.phone) or conversation.phone
-            self.chat_header_text.value = f"{title}  ·  {phone}" if phone else title
+            phone = self._conversation_phone_line(conversation)
+            self.chat_header_text.value = f"{contact_name}  ·  {phone}" if phone and phone != contact_name else contact_name
         self.controller.mark_conversation_read(conversation_id)
         self._reset_chat_messages(conversation_id)
         self._set_compose_enabled(self._last_status == STATUS_CONNECTED)
