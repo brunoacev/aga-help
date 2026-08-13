@@ -180,10 +180,14 @@ def _build_app_shell(page: ft.Page, *, on_logout) -> ft.Control:
         ft.Row(
             [
                 sidebar,
-                content_area,
+                ft.Container(
+                    content=content_area,
+                    expand=True,
+                    bgcolor=colors.BG_PRIMARY,
+                ),
             ],
             expand=True,
-            spacing=S2,
+            spacing=0,
             vertical_alignment=ft.CrossAxisAlignment.STRETCH,
         )
     )
