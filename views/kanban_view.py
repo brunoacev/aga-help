@@ -78,7 +78,7 @@ class KanbanView(ft.Container):
                 [
                     page_header(
                         "Acompanhamento de Pedidos",
-                        "Arraste mentalmente entre colunas usando as setas de cada card.",
+                        "Cards em grid 2×2 por coluna — use as ações na linha inferior para mover e auditar.",
                     ),
                     kanban_row,
                 ],
