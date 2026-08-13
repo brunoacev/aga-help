@@ -96,4 +96,24 @@ def init_db() -> None:
             """
         )
         backfill_order_timestamps()
+        migrate_kanban_statuses(conn)
         conn.commit()
+
+
+def migrate_kanban_statuses(conn) -> None:
+    """Converte status legados para PRODUCAO | PRONTO | FATURADO."""
+    from core.kanban_stages import STAGE_FATURADO, STAGE_PRODUCAO, STAGE_PRONTO
+
+    replacements = (
+        ("Orçamento", STAGE_PRODUCAO),
+        ("Orcamento", STAGE_PRODUCAO),
+        ("Produção", STAGE_PRODUCAO),
+        ("Producao", STAGE_PRODUCAO),
+        ("Pronto", STAGE_PRONTO),
+        ("Faturado", STAGE_FATURADO),
+    )
+    for old_status, new_status in replacements:
+        conn.execute(
+            "UPDATE orders SET status = ? WHERE status = ?",
+            (new_status, old_status),
+        )

@@ -12,6 +12,7 @@ from core import colors
 from core.auth.auth_service import bootstrap_users
 from core.auth.user_session import clear_user
 from core.db.schema import init_db
+from core.kanban_stages import KANBAN_STAGES, STAGE_COLORS
 from core.services.order_service import clear_all_orders
 from core.supabase_client import get_supabase
 from components.sidebar import Sidebar
@@ -60,13 +61,8 @@ def _offline_banner() -> ft.Container | None:
 
 
 def _build_app_shell(page: ft.Page, *, on_logout) -> ft.Control:
-    stages = ["Orçamento", "Produção", "Pronto", "Faturado"]
-    stage_colors = {
-        "Orçamento": colors.COLOR_ORCAMENTO,
-        "Produção": colors.COLOR_PRODUCAO,
-        "Pronto": colors.COLOR_PRONTO,
-        "Faturado": colors.COLOR_FATURADO,
-    }
+    stages = list(KANBAN_STAGES)
+    stage_colors = dict(STAGE_COLORS)
 
     content_area = ft.Container(expand=True, bgcolor=colors.BG_PRIMARY)
     commissions_view = CommissionsView(page)

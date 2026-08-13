@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from core.constants import AGATEK_ADDRESS
+from core.kanban_stages import STAGE_FATURADO, STAGE_PRODUCAO, normalize_order_status
 from core.db.connection import get_connection
 from core.db.logs_repository import add_log
 from utils.order_dates import ORDER_TIMESTAMP_FMT, current_order_timestamp, parse_order_created_date
@@ -22,7 +23,7 @@ def add_order(
     description: str,
     width: str = "",
     height: str = "",
-    status: str = "Orçamento",
+    status: str = STAGE_PRODUCAO,
     items_json: str = "[]",
     service_type: str = "componentes",
     created_at: str | None = None,
@@ -70,14 +71,14 @@ def get_orders() -> list[dict]:
     with get_connection() as conn:
         conn.row_factory = _row_factory
         rows = conn.execute("SELECT * FROM orders ORDER BY id DESC").fetchall()
-        return [dict(row) for row in rows]
+        return [_normalize_order_row(dict(row)) for row in rows]
 
 
 def update_order_status(order_id: int, new_status: str) -> None:
     """Atualiza o status de um pedido."""
     clean_status = sanitize_text(new_status, max_length=30)
     with get_connection() as conn:
-        if clean_status == "Faturado":
+        if clean_status == STAGE_FATURADO:
             conn.execute(
                 """
                 UPDATE orders
@@ -187,12 +188,17 @@ def backfill_order_timestamps() -> None:
             else:
                 created_value = created
 
-            if row.get("status") == "Faturado" and not billed:
+            if normalize_order_status(row.get("status")) == STAGE_FATURADO and not billed:
                 conn.execute(
                     "UPDATE orders SET billed_at = ? WHERE id = ?",
                     (created_value or now_str, order_id),
                 )
         conn.commit()
+
+
+def _normalize_order_row(row: dict) -> dict:
+    row["status"] = normalize_order_status(row.get("status"))
+    return row
 
 
 def _row_factory(cursor, row):

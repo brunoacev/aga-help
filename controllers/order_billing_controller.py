@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-BILLED_STAGE = "Faturado"
+from core.kanban_stages import BILLED_STAGE
 
 
 def is_order_billed(order: dict) -> bool:

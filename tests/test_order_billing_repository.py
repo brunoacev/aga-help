@@ -1,5 +1,6 @@
 """Testes de conclusão de faturamento no repositório."""
 
+from core.kanban_stages import STAGE_FATURADO, STAGE_PRONTO
 from core.db.orders_repository import add_order, get_orders, mark_order_billed, update_order_status
 from core.services.order_service import complete_order_billing
 
@@ -14,7 +15,7 @@ def test_mark_order_billed_persists_flag():
         entry_date="11/08/2026",
         deadline_date="12/08/2026",
         description="Pedido billing",
-        status="Faturado",
+        status=STAGE_FATURADO,
     )
     order_id = get_orders()[0]["id"]
     mark_order_billed(order_id, is_billed=True)
@@ -32,7 +33,7 @@ def test_complete_order_billing_service():
         entry_date="11/08/2026",
         deadline_date="12/08/2026",
         description="Pedido billing 2",
-        status="Faturado",
+        status=STAGE_FATURADO,
     )
     order_id = get_orders()[0]["id"]
     complete_order_billing(order_id)
@@ -49,11 +50,11 @@ def test_leaving_faturado_resets_is_billed():
         entry_date="11/08/2026",
         deadline_date="12/08/2026",
         description="Pedido billing 3",
-        status="Faturado",
+        status=STAGE_FATURADO,
     )
     order_id = get_orders()[0]["id"]
     mark_order_billed(order_id, is_billed=True)
-    update_order_status(order_id, "Pronto")
+    update_order_status(order_id, STAGE_PRONTO)
     saved = get_orders()[0]
-    assert saved["status"] == "Pronto"
+    assert saved["status"] == STAGE_PRONTO
     assert saved["is_billed"] == 0

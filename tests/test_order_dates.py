@@ -29,7 +29,7 @@ def test_format_order_date_label_from_entry_date():
 
 def test_resolve_billing_date_fallback():
     fallback = datetime(2026, 8, 11, 10, 0, 0)
-    order = {"status": "Faturado", "value": 100.0}
+    order = {"status": "FATURADO", "value": 100.0}
     assert resolve_order_billing_date(order, fallback=fallback) == fallback
 
 

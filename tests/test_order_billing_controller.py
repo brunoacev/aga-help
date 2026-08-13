@@ -14,7 +14,7 @@ def test_is_order_billed_reads_sqlite_flag():
 
 
 def test_billing_lock_blocks_common_user():
-    order = {"is_billed": 1, "status": "Faturado"}
+    order = {"is_billed": 1, "status": "FATURADO"}
     assert is_order_billing_locked(order, is_master=False)
     assert not is_order_billing_locked(order, is_master=True)
 

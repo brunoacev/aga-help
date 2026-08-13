@@ -21,7 +21,7 @@ def test_build_report_calculates_commission():
     controller.period = "Mensal"
     orders = [
         {
-            "status": "Faturado",
+            "status": "FATURADO",
             "value": 1000.0,
             "order_number": "100",
             "reseller_name": "Revenda A",
@@ -43,11 +43,12 @@ def test_legacy_order_without_date_uses_fallback():
     controller.period = "Diário"
     orders = [
         {
-            "status": "Faturado",
+            "status": "FATURADO",
             "value": 500.0,
             "order_number": "200",
             "reseller_name": "Revenda B",
             "payment_status": "Pendente",
+            "created_at": "2026-08-11 10:00:00",
         }
     ]
     with patch("controllers.commission_controller.get_orders", return_value=orders):

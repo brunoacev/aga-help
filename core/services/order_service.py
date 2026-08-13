@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from core.db import orders_repository
+from core.kanban_stages import STAGE_PRODUCAO, validate_kanban_status
 from core.db.logs_repository import add_log
 from core.services.order_history_service import record_order_action
 from utils.dates import add_business_days
@@ -67,14 +68,14 @@ def create_order(form_data: dict, *, created_by: str = "") -> tuple[bool, str]:
         description=sanitize_text(description),
         width=sanitize_text(form_data.get("width", ""), max_length=20),
         height=sanitize_text(form_data.get("height", ""), max_length=20),
-        status="Orçamento",
+        status=STAGE_PRODUCAO,
         items_json=serialize_order_items(form_data.get("items") or []),
         service_type=sanitize_text(form_data.get("service_type", SERVICE_PARTS), max_length=30),
         created_at=created_at,
         created_by=sanitize_text(created_by, max_length=40),
     )
     handle = (created_by or "@sistema").strip()
-    record_order_action(order_id, handle, f"{handle} criou este orçamento")
+    record_order_action(order_id, handle, f"{handle} criou este pedido em Produção")
     return True, ""
 
 
@@ -85,14 +86,15 @@ def get_orders() -> list[dict]:
 
 def update_order_status(order_id: int, new_status: str, *, user_handle: str = "", old_status: str = "") -> None:
     """Atualiza status do pedido."""
-    orders_repository.update_order_status(order_id, new_status)
-    add_log("STATUS", f"Pedido #{order_id} movido para {new_status}.")
+    clean_status = validate_kanban_status(new_status)
+    orders_repository.update_order_status(order_id, clean_status)
+    add_log("STATUS", f"Pedido #{order_id} movido para {clean_status}.")
     handle = (user_handle or "@sistema").strip()
-    if old_status and old_status != new_status:
+    if old_status and old_status != clean_status:
         record_order_action(
             order_id,
             handle,
-            f"{handle} moveu de '{old_status}' para '{new_status}'",
+            f"{handle} moveu de '{old_status}' para '{clean_status}'",
         )
 
 

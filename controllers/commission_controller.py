@@ -5,11 +5,11 @@ from __future__ import annotations
 from datetime import datetime
 
 from core.db.orders_repository import backfill_order_timestamps, get_orders
+from core.kanban_stages import BILLED_STAGE as BILLED_STATUS, normalize_order_status
 from utils.formatting import format_brl, safe_float
 from utils.order_dates import format_order_datetime, normalize_order_created_at, resolve_order_billing_date
 from utils.period_filter import format_period_label, get_period_bounds, shift_reference_date
 
-BILLED_STATUS = "Faturado"
 DEFAULT_COMMISSION_RATE = 5.0
 DEFAULT_FALLBACK_DATE = "11/08/2026"
 DEFAULT_FALLBACK_DATETIME = datetime(2026, 8, 11)
@@ -75,7 +75,7 @@ class CommissionController:
     @staticmethod
     def is_commission_eligible(order: dict) -> bool:
         """Pedido concluído/faturado com valor registrado."""
-        if order.get("status") != BILLED_STATUS:
+        if normalize_order_status(order.get("status")) != BILLED_STATUS:
             return False
         return CommissionController.order_value(order) >= 0.0
 

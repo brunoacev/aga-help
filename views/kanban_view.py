@@ -1,4 +1,4 @@
-"""View do quadro Kanban."""
+"""View do quadro Kanban — 3 colunas: Produção, Pronto, Faturado."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from controllers.order_billing_controller import (
     can_view_order_details,
 )
 from core import colors
+from core.kanban_stages import KANBAN_STAGES, normalize_order_status
 from core.services.order_service import complete_order_billing, delete_order, get_orders, update_order_status
 from components.kanban_column import KanbanColumn
 from components.order_details_dialog import show_order_items_dialog
@@ -32,7 +33,7 @@ class KanbanView(ft.Container):
         is_master: bool = False,
     ):
         self.app_page = page
-        self.stages = stages
+        self.stages = list(stages)
         self.stage_colors = stage_colors
         self.on_orders_changed = on_orders_changed
         self.is_master = is_master
@@ -51,12 +52,13 @@ class KanbanView(ft.Container):
         kanban_row = ft.Row(
             spacing=S4,
             expand=True,
-            wrap=False,
             vertical_alignment=ft.CrossAxisAlignment.STRETCH,
         )
 
         for stage in self.stages:
-            stage_orders = [o for o in orders if o.get("status") == stage]
+            stage_orders = [
+                o for o in orders if normalize_order_status(o.get("status")) == stage
+            ]
             kanban_row.controls.append(
                 KanbanColumn(
                     stage=stage,
@@ -77,8 +79,8 @@ class KanbanView(ft.Container):
             ft.Column(
                 [
                     page_header(
-                        "Acompanhamento de Pedidos",
-                        "Cards em grid 2×2 por coluna — use as ações na linha inferior para mover e auditar.",
+                        "Fluxo de Produção",
+                        "Produção → Pronto → Faturado. Novos pedidos entram em Produção.",
                     ),
                     kanban_row,
                 ],
@@ -100,9 +102,13 @@ class KanbanView(ft.Container):
                 success=False,
             )
             return
-        old_status = order.get("status") if order else ""
+        old_status = normalize_order_status(order.get("status") if order else "")
         handle = get_user_handle(self.app_page)
-        update_order_status(order_id, new_stage, user_handle=handle, old_status=old_status or "")
+        try:
+            update_order_status(order_id, new_stage, user_handle=handle, old_status=old_status)
+        except ValueError as exc:
+            show_snackbar(self.app_page, str(exc), success=False)
+            return
         self.refresh()
         self._notify_orders_changed()
 
