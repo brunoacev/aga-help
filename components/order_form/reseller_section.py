@@ -112,6 +112,15 @@ class ResellerSection(ft.Container):
         if self.on_profile_select:
             self.on_profile_select()
 
+    def prefill_contact(self, *, phone: str, reseller_name: str = "", address: str = "") -> None:
+        """Preenche campos a partir de um contato externo (ex.: WhatsApp)."""
+        self._is_updating = True
+        self.txt_reseller.value = reseller_name or ""
+        self.txt_phone.value = phone or ""
+        self.txt_address.value = address or ""
+        self.suggestions_container.visible = False
+        self._is_updating = False
+
     def hide_suggestions(self) -> None:
         self.suggestions_container.visible = False
 

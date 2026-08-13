@@ -221,3 +221,49 @@ def test_qr_data_uri_helper():
     uri = qr_data_uri("session-token")
     assert uri.startswith("data:image/png;base64,")
     assert generate_qr_base64("x")
+
+
+def test_build_order_prefill_from_conversation():
+    controller = WhatsAppController()
+    controller.client = MagicMock()
+    controller.client.list_chats.return_value = [
+        {
+            "id": "5585999999999@s.whatsapp.net",
+            "name": "Maria Silva",
+            "contact_name": "Maria Silva",
+            "phone": "+5585999999999",
+            "last_message": "Olá",
+            "unread": 2,
+            "timestamp": 1_700_000_000,
+            "is_group": False,
+        }
+    ]
+    conversation = controller.list_conversations()[0]
+    prefill = controller.build_order_prefill(conversation)
+    assert prefill is not None
+    assert prefill["phone"] == "+55 (85) 99999-9999"
+    assert prefill["reseller_name"] == "Maria Silva"
+
+
+def test_build_order_prefill_skips_groups():
+    from controllers.whatsapp_controller import WhatsAppConversation
+
+    controller = WhatsAppController()
+    conversation = WhatsAppConversation(
+        id="120363012345678901@g.us",
+        name="Equipe",
+        phone="",
+        last_message="",
+        is_group=True,
+        group_name="Equipe",
+    )
+    assert controller.build_order_prefill(conversation) is None
+
+
+def test_format_chat_timestamp_today():
+    from controllers.whatsapp_controller import format_chat_timestamp
+    from datetime import datetime
+
+    now = datetime.now()
+    ts = int(now.timestamp())
+    assert format_chat_timestamp(ts) == now.strftime("%H:%M")

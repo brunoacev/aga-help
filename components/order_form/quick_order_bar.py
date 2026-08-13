@@ -137,3 +137,20 @@ class QuickOrderBar(ft.Container):
         self.service_spec_section.reset()
         self.components_picker.reset()
         safe_update(self)
+
+    def prefill_from_whatsapp(
+        self,
+        *,
+        phone: str,
+        reseller_name: str = "",
+        address: str = "",
+    ) -> None:
+        """Abre o cadastro com telefone e nome vindos do chat WhatsApp."""
+        self.lbl_error.visible = False
+        self._clear_validation()
+        self.reseller_section.prefill_contact(
+            phone=phone,
+            reseller_name=reseller_name,
+            address=address,
+        )
+        safe_update(self)

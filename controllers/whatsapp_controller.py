@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
 import requests
 
@@ -33,6 +34,8 @@ class WhatsAppConversation:
     group_name: str = ""
     avatar: str = ""
     contact_name: str = ""
+    last_message_time: str = ""
+    timestamp: int = 0
 
 
 @dataclass(frozen=True)
@@ -132,6 +135,7 @@ class WhatsAppController:
                 local = find_contact_by_phone(formatted_phone)
                 if local and local.get("name"):
                     contact_name = str(local["name"]).strip()
+            timestamp = int(row.get("timestamp") or 0)
             conversations.append(
                 WhatsAppConversation(
                     id=chat_id,
@@ -143,6 +147,8 @@ class WhatsAppController:
                     group_name=group_name if is_group else "",
                     avatar=str(row.get("avatar") or ""),
                     contact_name="" if is_group else contact_name,
+                    last_message_time=format_chat_timestamp(timestamp),
+                    timestamp=timestamp,
                 )
             )
         self._conversations_cache = conversations
@@ -170,6 +176,36 @@ class WhatsAppController:
 
     def clear_active_chat(self) -> None:
         self.active_chat_id = None
+
+    def build_order_prefill(self, conversation: WhatsAppConversation | None) -> dict | None:
+        """Monta dados para o formulário de pedido a partir de uma conversa individual."""
+        if not conversation or conversation.is_group:
+            return None
+
+        phone = (conversation.phone or "").strip()
+        if not phone and conversation.id and not conversation.id.endswith("@lid"):
+            phone = format_br_phone(conversation.id)
+        if not phone:
+            return None
+
+        reseller_name = (conversation.contact_name or "").strip()
+        address = ""
+        local = find_contact_by_phone(phone)
+        if local:
+            if not reseller_name:
+                reseller_name = str(local.get("name") or "").strip()
+            address = str(local.get("address") or "").strip()
+
+        if not reseller_name:
+            fallback = (conversation.name or "").strip()
+            if fallback and format_br_phone(fallback) != phone:
+                reseller_name = fallback
+
+        return {
+            "phone": phone,
+            "reseller_name": reseller_name,
+            "address": address,
+        }
 
     def filter_conversations(self, query: str) -> list[WhatsAppConversation]:
         conversations = self._conversations_cache or self.list_conversations()
@@ -284,3 +320,22 @@ class WhatsAppController:
             return self.client.get_status()
         except requests.RequestException:
             return {"status": STATUS_DISCONNECTED, "phone": ""}
+
+
+def format_chat_timestamp(timestamp: int) -> str:
+    """Formata timestamp da conversa para exibição compacta na lista."""
+    if not timestamp:
+        return ""
+    ts = timestamp
+    if ts > 1_000_000_000_000:
+        ts //= 1000
+    try:
+        dt = datetime.fromtimestamp(ts)
+    except (OSError, OverflowError, ValueError):
+        return ""
+    now = datetime.now()
+    if dt.date() == now.date():
+        return dt.strftime("%H:%M")
+    if dt.year == now.year:
+        return dt.strftime("%d/%m")
+    return dt.strftime("%d/%m/%y")

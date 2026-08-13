@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 
 import flet as ft
 
@@ -31,8 +32,13 @@ POLL_INTERVAL_SECONDS = 2
 class WhatsAppView(ft.Container):
     """Painel de conversas e chat estilo WhatsApp Web."""
 
-    def __init__(self, page: ft.Page):
+    def __init__(
+        self,
+        page: ft.Page,
+        on_create_order: Callable[[dict], None] | None = None,
+    ):
         self.app_page = page
+        self.on_create_order = on_create_order
         self.controller = WhatsAppController()
         self.border_all = border_all(colors.BORDER_COLOR)
         self.selected_conversation_id: str | None = None
@@ -155,8 +161,21 @@ class WhatsAppView(ft.Container):
             weight=ft.FontWeight.W_600,
             expand=True,
         )
+        self.btn_create_order = ft.FilledButton(
+            content="+ Criar Pedido para este Contato",
+            icon=getattr(ft.Icons, "ADD_SHOPPING_CART_ROUNDED", None) or "add_shopping_cart",
+            bgcolor=colors.WA_ACCENT,
+            color=colors.WA_BUBBLE_TEXT,
+            visible=False,
+            disabled=True,
+            on_click=self._on_create_order,
+        )
         self.chat_header = ft.Row(
-            [self.chat_header_icon, self.chat_header_text],
+            [
+                self.chat_header_icon,
+                self.chat_header_text,
+                self.btn_create_order,
+            ],
             spacing=S2,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         )
@@ -247,15 +266,27 @@ class WhatsAppView(ft.Container):
             padding=S3,
             content=ft.Column(
                 [
-                    text_section_heading("Status da Conexão"),
-                    self.node_alert,
-                    self.lbl_connection_status,
-                    self.qr_panel,
-                    self.connected_panel,
+                    ft.Column(
+                        [
+                            text_section_heading("Status da Conexão"),
+                            self.node_alert,
+                            self.lbl_connection_status,
+                            self.qr_panel,
+                            self.connected_panel,
+                        ],
+                        spacing=S3,
+                        tight=True,
+                    ),
                     ft.Divider(height=1, color=colors.BORDER_COLOR),
-                    text_section_heading("Conversas"),
-                    self.txt_search,
-                    ft.Container(content=self.conversations_column, expand=True),
+                    ft.Column(
+                        [
+                            text_section_heading("Conversas"),
+                            self.txt_search,
+                            ft.Container(content=self.conversations_column, expand=True),
+                        ],
+                        spacing=S3,
+                        expand=True,
+                    ),
                 ],
                 spacing=S3,
                 expand=True,
@@ -457,6 +488,8 @@ class WhatsAppView(ft.Container):
         return self.controller.filter_conversations(self._chat_filter)
 
     def _render_conversation_list(self) -> None:
+        if self._last_status == STATUS_CONNECTED:
+            self.controller.list_conversations()
         conversations = self._filtered_conversations()
         self.conversations_column.controls.clear()
         if not conversations:
@@ -497,47 +530,70 @@ class WhatsAppView(ft.Container):
             return ""
         return format_br_phone(conversation.id)
 
+    def _build_unread_badge(self, count: int) -> ft.Container:
+        label = str(count) if count < 100 else "99+"
+        return ft.Container(
+            content=ft.Text(
+                label,
+                size=10,
+                color=colors.WA_BUBBLE_TEXT,
+                weight=ft.FontWeight.W_700,
+                text_align=ft.TextAlign.CENTER,
+            ),
+            bgcolor=colors.WA_ACCENT,
+            border_radius=12,
+            width=22,
+            height=22,
+            alignment=get_alignment_center(),
+        )
+
     def _build_conversation_tile(self, conversation: WhatsAppConversation) -> ft.Container:
         is_active = conversation.id == self.selected_conversation_id
         preview_color = colors.WA_LIST_NAME if conversation.unread else colors.WA_LIST_PREVIEW
         preview = conversation.last_message or "Sem mensagens"
         contact_name = self._conversation_contact_name(conversation)
         phone_line = self._conversation_phone_line(conversation)
+        display_name = contact_name or phone_line or ("Grupo" if conversation.is_group else "Contato")
 
-        text_lines: list[ft.Control] = []
-        if conversation.is_group:
-            text_lines.append(
+        header_right: list[ft.Control] = []
+        if conversation.last_message_time:
+            header_right.append(
                 ft.Text(
-                    contact_name,
+                    conversation.last_message_time,
+                    size=10,
+                    color=colors.WA_META_INCOMING,
+                )
+            )
+        if conversation.unread > 0:
+            header_right.append(self._build_unread_badge(conversation.unread))
+
+        title_row = ft.Row(
+            [
+                ft.Text(
+                    display_name,
                     size=FONT_BODY,
                     weight=ft.FontWeight.W_600,
                     color=colors.WA_LIST_NAME,
                     overflow=ft.TextOverflow.ELLIPSIS,
                     expand=True,
+                ),
+                ft.Row(header_right, spacing=S1, tight=True),
+            ],
+            spacing=S2,
+            vertical_alignment=ft.CrossAxisAlignment.START,
+        )
+
+        text_lines: list[ft.Control] = [title_row]
+        if not conversation.is_group and contact_name and phone_line:
+            text_lines.append(
+                ft.Text(
+                    phone_line,
+                    size=10,
+                    color=colors.WA_META_INCOMING,
+                    overflow=ft.TextOverflow.ELLIPSIS,
+                    expand=True,
                 )
             )
-        else:
-            if contact_name:
-                text_lines.append(
-                    ft.Text(
-                        contact_name,
-                        size=FONT_BODY,
-                        weight=ft.FontWeight.W_600,
-                        color=colors.WA_LIST_NAME,
-                        overflow=ft.TextOverflow.ELLIPSIS,
-                        expand=True,
-                    )
-                )
-            if phone_line:
-                text_lines.append(
-                    ft.Text(
-                        phone_line,
-                        size=10,
-                        color=colors.WA_META_INCOMING,
-                        overflow=ft.TextOverflow.ELLIPSIS,
-                        expand=True,
-                    )
-                )
         text_lines.append(
             ft.Text(
                 preview,
@@ -784,6 +840,7 @@ class WhatsAppView(ft.Container):
         self._sync_index[conversation_id] = len(messages)
         self.chat_empty_hint.visible = not messages
         self._set_compose_enabled(self._last_status == STATUS_CONNECTED)
+        self._update_create_order_button(conversation)
         self._render_conversation_list()
         self._schedule_scroll_to_bottom()
         self._update_ui()
@@ -824,6 +881,28 @@ class WhatsAppView(ft.Container):
         self._render_conversation_list()
         self._render_page()
 
+    def _update_create_order_button(self, conversation: WhatsAppConversation | None = None) -> None:
+        conversation = conversation or self.controller.get_active_conversation()
+        prefill = self.controller.build_order_prefill(conversation)
+        can_create = bool(prefill and self.on_create_order)
+        self.btn_create_order.visible = bool(conversation and not conversation.is_group)
+        self.btn_create_order.disabled = not can_create
+
+    def _on_create_order(self, _e) -> None:
+        conversation = self.controller.get_active_conversation()
+        prefill = self.controller.build_order_prefill(conversation)
+        if not prefill:
+            show_snackbar(
+                self.app_page,
+                "Selecione um contato individual com telefone válido.",
+                success=False,
+            )
+            return
+        if not self.on_create_order:
+            show_snackbar(self.app_page, "Cadastro de pedidos indisponível.", success=False)
+            return
+        self.on_create_order(prefill)
+
     def _on_generate_qr(self, _e) -> None:
         ok, error = self.controller.regenerate_qr()
         if not ok:
@@ -846,5 +925,6 @@ class WhatsAppView(ft.Container):
         self.controller.clear_active_chat()
         self.messages_list.controls.clear()
         self._set_compose_enabled(False)
+        self._update_create_order_button(None)
         show_snackbar(self.app_page, "Sessão WhatsApp encerrada.", success=True)
         self._render_page()

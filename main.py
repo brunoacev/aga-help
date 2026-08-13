@@ -98,7 +98,16 @@ def _build_app_shell(page: ft.Page, *, on_logout) -> ft.Control:
     agenda_view = AgendaView(page)
     materials_view = MaterialsView()
     logs_view = LogsView()
-    whatsapp_view = WhatsAppView(page)
+
+    def on_create_order_from_whatsapp(prefill: dict) -> None:
+        quick_order_view.prefill_from_whatsapp(
+            phone=str(prefill.get("phone") or ""),
+            reseller_name=str(prefill.get("reseller_name") or ""),
+            address=str(prefill.get("address") or ""),
+        )
+        navigate_to("add")
+
+    whatsapp_view = WhatsAppView(page, on_create_order=on_create_order_from_whatsapp)
 
     def navigate_to(view_name: str) -> None:
         sidebar.set_active(view_name)
