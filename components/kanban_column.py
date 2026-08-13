@@ -29,8 +29,11 @@ class KanbanColumn(ft.Container):
         on_history_callback=None,
         is_master: bool = False,
         expand: bool | int = False,
+        compact: bool = False,
     ):
         label = stage_label(stage)
+        pad = S2 if compact else S4
+        card_spacing = S2 if compact else S3
         header = ft.Row(
             [
                 ft.Row(
@@ -56,7 +59,7 @@ class KanbanColumn(ft.Container):
         )
 
         cards_list = ft.Column(
-            spacing=S3,
+            spacing=card_spacing,
             scroll=ft.ScrollMode.AUTO,
             expand=True,
             tight=True,
@@ -71,6 +74,7 @@ class KanbanColumn(ft.Container):
                     cards_list, pending, stages, on_move_callback, on_delete_callback,
                     on_details_callback, on_complete_callback=on_complete_callback,
                     on_history_callback=on_history_callback, is_master=is_master,
+                    compact=compact,
                 )
             if completed:
                 if pending:
@@ -80,6 +84,7 @@ class KanbanColumn(ft.Container):
                     cards_list, completed, stages, on_move_callback, on_delete_callback,
                     on_details_callback, on_complete_callback=on_complete_callback,
                     on_history_callback=on_history_callback, is_master=is_master,
+                    compact=compact,
                 )
             if not pending and not completed:
                 self._append_empty_state(cards_list)
@@ -88,6 +93,7 @@ class KanbanColumn(ft.Container):
                 cards_list, orders, stages, on_move_callback, on_delete_callback,
                 on_details_callback, on_complete_callback=on_complete_callback,
                 on_history_callback=on_history_callback, is_master=is_master,
+                compact=compact,
             )
         else:
             self._append_empty_state(cards_list)
@@ -97,10 +103,10 @@ class KanbanColumn(ft.Container):
             bgcolor=colors.BG_SURFACE,
             border=border_all(colors.BORDER_COLOR),
             border_radius=RADIUS,
-            padding=S4,
+            padding=pad,
             content=ft.Column(
                 [header, ft.Divider(color=colors.BORDER_COLOR, height=1), cards_list],
-                spacing=S3,
+                spacing=card_spacing,
                 tight=True,
                 expand=True,
             ),
@@ -140,6 +146,7 @@ class KanbanColumn(ft.Container):
         on_complete_callback=None,
         on_history_callback=None,
         is_master: bool = False,
+        compact: bool = False,
     ) -> None:
         for order in orders:
             cards_list.controls.append(
@@ -152,5 +159,6 @@ class KanbanColumn(ft.Container):
                     on_complete_callback=on_complete_callback,
                     on_history_callback=on_history_callback,
                     is_master=is_master,
+                    compact=compact,
                 )
             )

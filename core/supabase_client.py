@@ -7,6 +7,10 @@ from typing import Any
 
 import requests
 
+from core.env_loader import load_project_env
+
+load_project_env()
+
 try:
     from dotenv import load_dotenv
 
@@ -105,6 +109,17 @@ class SupabaseClient:
     @property
     def is_online(self) -> bool:
         return self.ping()
+
+    def reload_config(self) -> None:
+        """Recarrega credenciais do ambiente/.env e limpa cache de conexão."""
+        load_project_env()
+        self.url = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
+        self.key = (
+            os.getenv("SUPABASE_KEY", "").strip()
+            or os.getenv("SUPABASE_ANON_KEY", "").strip()
+        )
+        self.database_url = os.getenv("DATABASE_URL", "").strip()
+        self.reset_cache()
 
     def reset_cache(self) -> None:
         self._online = None

@@ -31,7 +31,15 @@ def border_all(color: str, width: int = 1):
         return ft.Border.all(width, color)
     if hasattr(ft, "border") and hasattr(ft.border, "all"):
         return ft.border.all(width, color)
-    return ft.Border.all(width, color)
+    side = ft.BorderSide(width, color)
+    if hasattr(ft, "Border"):
+        return ft.Border(top=side, right=side, bottom=side, left=side)
+    return ft.border.only(
+        top=ft.border.BorderSide(width, color),
+        right=ft.border.BorderSide(width, color),
+        bottom=ft.border.BorderSide(width, color),
+        left=ft.border.BorderSide(width, color),
+    )
 
 
 def make_button(text: str, on_click, *, icon=None, bgcolor=None, color=None, style=None):

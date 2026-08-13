@@ -6,7 +6,7 @@ import flet as ft
 
 from core import colors
 from core.auth.user_session import get_user_handle
-from utils.flet_compat import get_alignment_center, make_padding_symmetric, safe_update
+from utils.flet_compat import border_all, get_alignment_center, make_padding_symmetric, safe_update
 from utils.ui_theme import RADIUS, RADIUS_LG, S2, S3, icon_button
 
 SIDEBAR_WIDTH = 76
@@ -88,7 +88,7 @@ class Sidebar(ft.Container):
             height=36,
             alignment=get_alignment_center(),
             bgcolor=colors.BG_SURFACE_LIGHT,
-            border=ft.border.all(1, colors.PRIMARY),
+            border=border_all(colors.PRIMARY),
             border_radius=18,
             tooltip=handle,
         )

@@ -33,8 +33,13 @@ class KanbanCard(ft.Container):
         on_complete_callback=None,
         on_history_callback=None,
         is_master: bool = False,
+        compact: bool = False,
     ):
         order_id = order["id"]
+        icon_size = 16 if compact else 18
+        card_pad = S2 if compact else S3
+        label_size = FONT_CAPTION if compact else FONT_LABEL
+        body_size = FONT_CAPTION if compact else FONT_BODY
         order_number = _format_order_number(order)
         client_name = order.get("reseller_name", "Cliente")
         current_status = normalize_order_status(order.get("status"))
@@ -53,7 +58,7 @@ class KanbanCard(ft.Container):
                 ft.Text(
                     f"Pedido {order_number}",
                     weight=ft.FontWeight.W_600,
-                    size=FONT_LABEL,
+                    size=label_size,
                     color=colors.TEXT_PRIMARY,
                     style=ft.TextStyle(decoration=title_decoration) if title_decoration else None,
                 ),
@@ -64,7 +69,7 @@ class KanbanCard(ft.Container):
 
         client_row = ft.Text(
             client_name,
-            size=FONT_BODY,
+            size=body_size,
             color=colors.PRIMARY,
             weight=ft.FontWeight.W_500,
             overflow=ft.TextOverflow.ELLIPSIS,
@@ -123,7 +128,7 @@ class KanbanCard(ft.Container):
             tooltip="Ver Detalhes dos Itens",
             on_click=lambda _: on_details_callback(order),
             disabled=locked,
-            size=18,
+            size=icon_size,
         )
         btn_history = icon_button(
             "HISTORY",
@@ -132,7 +137,7 @@ class KanbanCard(ft.Container):
             tooltip="Histórico de Ações",
             on_click=lambda _: on_history_callback(order) if on_history_callback else None,
             disabled=on_history_callback is None,
-            size=18,
+            size=icon_size,
         )
 
         action_buttons: list[ft.Control] = []
@@ -147,7 +152,7 @@ class KanbanCard(ft.Container):
                     color=colors.TEXT_SECONDARY,
                     tooltip=f"Voltar para {stage_label(prev)}",
                     on_click=lambda _: on_move_callback(order_id, prev),
-                    size=18,
+                    size=icon_size,
                 )
             )
 
@@ -160,7 +165,7 @@ class KanbanCard(ft.Container):
                     color=colors.PRIMARY,
                     tooltip=f"Avançar para {stage_label(nxt)}",
                     on_click=lambda _: on_move_callback(order_id, nxt),
-                    size=18,
+                    size=icon_size,
                 )
             )
 
@@ -172,21 +177,20 @@ class KanbanCard(ft.Container):
                 color=colors.SUCCESS,
                 tooltip="Concluir Faturamento",
                 on_click=lambda _: on_complete_callback(order_id),
-                size=18,
+                size=icon_size,
             )
         elif current_status == BILLED_STAGE and billed:
             billing_action = ft.Container(
-                content=ft.Row(
-                    [
-                        ft.Icon(getattr(ft.Icons, "VERIFIED", None) or "verified", color=colors.SUCCESS, size=16),
-                        ft.Text("Faturado & Concluído", size=FONT_CAPTION, color=colors.SUCCESS, weight=ft.FontWeight.W_600),
-                    ],
-                    spacing=S2 // 2,
+                content=ft.Icon(
+                    getattr(ft.Icons, "CHECK_ROUNDED", None) or "check",
+                    color=colors.SUCCESS,
+                    size=icon_size,
                 ),
                 bgcolor=colors.BG_SUCCESS_SUBTLE,
                 border=border_all(colors.SUCCESS),
                 border_radius=RADIUS,
-                padding=make_padding_symmetric(horizontal=S2, vertical=S2),
+                padding=make_padding_symmetric(horizontal=6, vertical=6),
+                tooltip="Faturado e concluído",
             )
 
         btn_delete = icon_button(
@@ -196,7 +200,7 @@ class KanbanCard(ft.Container):
             tooltip="Excluir Pedido",
             on_click=lambda _: on_delete_callback(order_id),
             disabled=locked,
-            size=18,
+            size=icon_size,
         )
 
         left_actions = [btn_details, btn_history, *action_buttons]
@@ -215,7 +219,7 @@ class KanbanCard(ft.Container):
             bgcolor=card_bg,
             border=border_all(card_border),
             border_radius=RADIUS,
-            padding=S3,
+            padding=card_pad,
             on_hover=self._on_hover,
             data={"billed": billed},
             content=ft.Column(
